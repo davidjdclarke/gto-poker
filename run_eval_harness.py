@@ -405,7 +405,7 @@ def main():
     parser.add_argument("--behavioral", action="store_true", help="Run behavioral regression suite")
     parser.add_argument("--behavioral-baseline", type=str, default=None,
                         help="Path to baseline behavioral_regression.json for delta comparison")
-    parser.add_argument("--hands", type=int, default=500, help="Hands per matchup (default 500)")
+    parser.add_argument("--hands", type=int, default=2000, help="Hands per matchup (default 2000)")
     parser.add_argument("--quick", action="store_true", help="Quick check (100 hands)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--bb", type=int, default=20, help="Big blind size")

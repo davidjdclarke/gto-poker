@@ -9,7 +9,12 @@ extensions = [
         sources=["server/gto/cfr_fast.pyx"],
         include_dirs=[np.get_include()],
         extra_compile_args=["-O3", "-march=native", "-ffast-math"],
-    )
+    ),
+    Extension(
+        "eval_harness.eval_fast",
+        sources=["eval_harness/eval_fast.pyx"],
+        extra_compile_args=["-O3", "-march=native", "-ffast-math"],
+    ),
 ]
 
 setup(

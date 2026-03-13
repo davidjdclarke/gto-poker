@@ -1,0 +1,94 @@
+{
+  "gauntlet": {
+    "AggroBot": {
+      "bb_per_100": 440.62,
+      "showdown_pct": 16.6,
+      "num_hands": 2000,
+      "p0_total_bb": 8812.5,
+      "phases": {
+        "preflop": 2000,
+        "flop": 933,
+        "turn": 675,
+        "river": 483
+      }
+    },
+    "OverfoldBot": {
+      "bb_per_100": 62.1,
+      "showdown_pct": 28.6,
+      "num_hands": 2000,
+      "p0_total_bb": 1242.0,
+      "phases": {
+        "preflop": 2000,
+        "flop": 1201,
+        "turn": 864,
+        "river": 715
+      }
+    },
+    "WeirdSizingBot": {
+      "bb_per_100": 277.19,
+      "showdown_pct": 22.3,
+      "num_hands": 2000,
+      "p0_total_bb": 5543.85,
+      "phases": {
+        "preflop": 2000,
+        "flop": 1135,
+        "turn": 817,
+        "river": 619
+      }
+    },
+    "DonkBot": {
+      "bb_per_100": 538.17,
+      "showdown_pct": 43.6,
+      "num_hands": 2000,
+      "p0_total_bb": 10763.4,
+      "phases": {
+        "preflop": 2000,
+        "flop": 1396,
+        "turn": 1225,
+        "river": 1086
+      }
+    },
+    "NitBot": {
+      "bb_per_100": 203.92,
+      "showdown_pct": 30.3,
+      "num_hands": 2000,
+      "p0_total_bb": 4078.45,
+      "phases": {
+        "preflop": 2000,
+        "flop": 1187,
+        "turn": 961,
+        "river": 770
+      }
+    },
+    "PerturbBot": {
+      "bb_per_100": -189.09,
+      "showdown_pct": 40.5,
+      "num_hands": 2000,
+      "p0_total_bb": -3781.8,
+      "phases": {
+        "preflop": 2000,
+        "flop": 1662,
+        "turn": 1277,
+        "river": 1029
+      }
+    },
+    "CallStationBot": {
+      "bb_per_100": -623.88,
+      "showdown_pct": 85.2,
+      "num_hands": 2000,
+      "p0_total_bb": -12477.7,
+      "phases": {
+        "preflop": 2000,
+        "flop": 1905,
+        "turn": 1864,
+        "river": 1804
+      }
+    },
+    "_summary": {
+      "avg_bb_per_100": 101.29,
+      "best_matchup": "DonkBot",
+      "worst_matchup": "CallStationBot",
+      "strategy_hit_rate": 93.6
+    }
+  }
+}

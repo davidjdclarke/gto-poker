@@ -21,6 +21,13 @@ from server.gto.abstraction import (
     classify_hand_type, make_bucket, NUM_EQUITY_BUCKETS,
 )
 
+# Try to use Cython-accelerated equity (~47x faster)
+try:
+    from eval_harness.eval_fast import hand_equity_fast as _cy_equity
+    _HAS_FAST_EVAL = True
+except ImportError:
+    _HAS_FAST_EVAL = False
+
 
 # ---------------------------------------------------------------------------
 # Preflop bucket cache
@@ -39,16 +46,45 @@ def _canonical_key(hole_cards: list[Card]) -> str:
     return f"{high}_{low}_{suited}"
 
 
+def _ehs2_fast(hole_cards, community, simulations=300):
+    """Compute E[HS^2] using Cython equity if available."""
+    import random as _rng
+    if len(community) >= 5:
+        if _HAS_FAST_EVAL:
+            eq = _cy_equity(hole_cards, community, simulations=simulations)
+        else:
+            eq = hand_equity(hole_cards, community, num_opponents=1,
+                             simulations=simulations)
+        return eq * eq
+
+    dead = set((c.rank, c.suit) for c in hole_cards + community)
+    remaining = [c for c in make_deck() if (c.rank, c.suit) not in dead]
+    num_rollouts = min(simulations, len(remaining))
+    sampled_cards = _rng.sample(remaining, num_rollouts)
+
+    sum_hs_sq = 0.0
+    inner_sims = max(50, simulations // 5)
+    for next_card in sampled_cards:
+        future_community = list(community) + [next_card]
+        if _HAS_FAST_EVAL:
+            eq = _cy_equity(hole_cards, future_community,
+                            simulations=inner_sims)
+        else:
+            eq = hand_equity(hole_cards, future_community,
+                             num_opponents=1, simulations=inner_sims)
+        sum_hs_sq += eq * eq
+
+    return sum_hs_sq / num_rollouts if num_rollouts > 0 else 0.0
+
+
 def build_preflop_cache(simulations: int = 500):
     """
     Build bucket cache for all 169 canonical preflop hands.
-    Takes ~30s at 500 sims. Only needs to run once per session.
+    With Cython eval: ~1s. Without: ~30s. Only needs to run once per session.
     """
     global _PREFLOP_CACHE_BUILT
     if _PREFLOP_CACHE_BUILT:
         return
-
-    from server.gto.equity import hand_strength_squared
 
     for r1 in range(2, 15):
         for r2 in range(2, r1 + 1):
@@ -59,9 +95,7 @@ def build_preflop_cache(simulations: int = 500):
                 if key in _PREFLOP_BUCKET_CACHE:
                     continue
 
-                # Full EHS2 computation (accurate, but only done once)
-                ehs2 = hand_strength_squared(cards, [], num_opponents=1,
-                                             simulations=simulations)
+                ehs2 = _ehs2_fast(cards, [], simulations=simulations)
                 score = ehs2 ** 0.5
                 eq_bucket = min(int(score * NUM_EQUITY_BUCKETS),
                                 NUM_EQUITY_BUCKETS - 1)
@@ -80,8 +114,7 @@ def get_preflop_bucket(hole_cards: list[Card]) -> int:
         return _PREFLOP_BUCKET_CACHE[key]
 
     # Cache miss — compute and store
-    from server.gto.equity import hand_strength_squared
-    ehs2 = hand_strength_squared(hole_cards, [], num_opponents=1, simulations=300)
+    ehs2 = _ehs2_fast(hole_cards, [], simulations=300)
     score = ehs2 ** 0.5
     eq_bucket = min(int(score * NUM_EQUITY_BUCKETS), NUM_EQUITY_BUCKETS - 1)
     c1, c2 = hole_cards
@@ -105,8 +138,11 @@ def fast_postflop_bucket(hole_cards: list[Card], community: list[Card],
     The bucket won't exactly match training buckets, but for evaluation
     purposes (where we need speed over exact match) this is fine.
     """
-    eq = hand_equity(hole_cards, community, num_opponents=1,
-                     simulations=simulations)
+    if _HAS_FAST_EVAL:
+        eq = _cy_equity(hole_cards, community, simulations=simulations)
+    else:
+        eq = hand_equity(hole_cards, community, num_opponents=1,
+                         simulations=simulations)
     eq_bucket = min(int(eq * NUM_EQUITY_BUCKETS), NUM_EQUITY_BUCKETS - 1)
 
     c1, c2 = hole_cards
@@ -179,7 +215,13 @@ def fast_bot_equity(hole_cards: list[Card], community: list[Card]) -> float:
     if len(community) == 0:
         key = _canonical_key(hole_cards)
         if key not in _BOT_EQUITY_CACHE:
-            _BOT_EQUITY_CACHE[key] = hand_equity(
-                hole_cards, [], num_opponents=1, simulations=200)
+            if _HAS_FAST_EVAL:
+                _BOT_EQUITY_CACHE[key] = _cy_equity(
+                    hole_cards, [], simulations=200)
+            else:
+                _BOT_EQUITY_CACHE[key] = hand_equity(
+                    hole_cards, [], num_opponents=1, simulations=200)
         return _BOT_EQUITY_CACHE[key]
+    if _HAS_FAST_EVAL:
+        return _cy_equity(hole_cards, community, simulations=30)
     return hand_equity(hole_cards, community, num_opponents=1, simulations=30)

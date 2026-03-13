@@ -24,9 +24,9 @@ Identify the dominant bottleneck in the v7 solver by running 5 isolated ablation
 | PerturbBot | +1552.1 | -1229.0 | +1092.2 | -822.1 | -366.0 |
 | WeirdSizingBot | -484.1 | -729.5 | -838.9 | -626.7 | -952.4 |
 | CallStationBot | -1236.6 | -668.5 | -1226.8 | -506.8 | -437.0 |
-| **Average** | **+174.0** | **-26.8** | **+137.2** | **-68.9** | **-226.2** |
+| **Average** | **+174.0** | **-291.1** | **+137.2** | **-68.9** | **-226.2** |
 
-Note: Exp E per-bot numbers are from a second eval run (different seed from the +159.3 summary). High variance across runs is expected with 500 hands/bot.
+Note: Exp E showed +159.3 avg on first run vs -291.1 on second (different seed). High variance across runs is expected with only 500 hands/bot — results should be interpreted directionally, not as precise estimates. Increasing to 2000+ hands/bot recommended for future studies.
 
 ## Exploitability (bb/100, 3-seed)
 
