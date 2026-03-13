@@ -1,0 +1,52 @@
+{
+  "name": "baseline_v51_20m",
+  "description": "v5.1 baseline: 20M iteration CFR+ with 120 buckets (8 equity x 15 hand types), position encoding, fixed postflop pot + preflop fold + blind tracking",
+  "date": "2026-03-11",
+  "strategy_file": "baseline_v51_20m_strategy.json",
+  "strategy_version": 5,
+  "training": {
+    "iterations": 20010000,
+    "sampling": "external",
+    "averaging_delay_ratio": 0.25,
+    "total_train_time_s": 655.2,
+    "ms_per_iteration": 0.03,
+    "engine": "Cython"
+  },
+  "abstraction": {
+    "equity_buckets": 8,
+    "hand_types": 15,
+    "total_buckets": 120,
+    "position_encoding": true,
+    "hand_type_labels": [
+      "PREMIUM_PAIR", "HIGH_PAIR", "MID_PAIR", "LOW_PAIR",
+      "STRONG_BROADWAY", "BROADWAY", "SUITED_ACE",
+      "HIGH_SUITED_CONNECTOR", "LOW_SUITED_CONNECTOR", "SUITED_GAPPER",
+      "STRONG_OFFSUIT_ACE", "WEAK_OFFSUIT_ACE", "OFFSUIT_BROADWAY",
+      "SUITED_TRASH", "TRASH"
+    ]
+  },
+  "strategy_stats": {
+    "num_nodes": 251040
+  },
+  "exploitability": {
+    "all_phases_500_samples": 1.4078,
+    "all_phases_std": 0.0346,
+    "preflop_only_500_samples": 1.6598,
+    "note": "Monte Carlo BR with 500 samples, 3 seeds, CV ~2%"
+  },
+  "bugs_fixed_since_v5": [
+    "Postflop zero-pot: inv=[0,0] made all bets zero, postflop never learned. Fix: inv=[0.5,0.5]",
+    "Preflop fold missing: SB could not fold vs BB. Fix: has_bet_to_call=True for preflop root",
+    "Blind tracking: SB/BB investments were [0.5,0.5] not [0.5,1.0]. Fix: correct blind model"
+  ],
+  "convergence_curve": [
+    {"iterations": 10000, "exploitability": 45.92, "std": 1.50, "nodes": 224142},
+    {"iterations": 20010000, "exploitability": 1.41, "std": 0.03, "nodes": 251040}
+  ],
+  "strategy_quality": {
+    "preflop_oop": "Fold 72-95% low equity, limp 99% mid equity, raise/shove mix at high equity",
+    "preflop_ip_vs_raise": "99% fold low EQ, 98-99% call mid EQ, heavy 3bet/all-in at EQ 7",
+    "flop_oop": "Check 61-66% weak, 99% check mid, thin value bet strong, trap/shove nuts",
+    "all_streets_converged": true
+  }
+}

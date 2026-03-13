@@ -1,0 +1,220 @@
+{
+  "offtree": {
+    "mapping": {
+      "preflop": [
+        {
+          "label": "min-open 2x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "small open 2.2x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "standard 2.5x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "large open 3x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "oversize 3.5x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "5x open",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "small 3bet 2.5x",
+          "mapped": "three_bet"
+        },
+        {
+          "label": "standard 3bet 3x",
+          "mapped": "three_bet"
+        },
+        {
+          "label": "large 3bet 3.5x",
+          "mapped": "three_bet"
+        },
+        {
+          "label": "oversize 3bet 4x",
+          "mapped": "three_bet"
+        }
+      ],
+      "postflop": [
+        {
+          "label": "10% pot (micro)",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "15% pot",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "20% pot",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "25% pot",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "28% pot",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "33% pot (on-tree)",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "40% pot",
+          "mapped": "bet_half"
+        },
+        {
+          "label": "42% pot",
+          "mapped": "bet_half"
+        },
+        {
+          "label": "50% pot (on-tree)",
+          "mapped": "bet_half"
+        },
+        {
+          "label": "60% pot",
+          "mapped": "bet_half"
+        },
+        {
+          "label": "67% pot",
+          "mapped": "bet_half"
+        },
+        {
+          "label": "75% pot",
+          "mapped": "bet_pot"
+        },
+        {
+          "label": "85% pot",
+          "mapped": "bet_pot"
+        },
+        {
+          "label": "100% pot (on-tree)",
+          "mapped": "bet_pot"
+        },
+        {
+          "label": "120% pot (overbet)",
+          "mapped": "bet_pot"
+        },
+        {
+          "label": "150% pot (large overbet)",
+          "mapped": "all_in"
+        },
+        {
+          "label": "200% pot (massive overbet)",
+          "mapped": "all_in"
+        },
+        {
+          "label": "min-raise (20 into 100)",
+          "mapped": "bet_third"
+        }
+      ],
+      "collisions": {
+        "preflop:open_raise": [
+          2.0,
+          2.2,
+          2.5,
+          3.0,
+          3.5,
+          5.0
+        ],
+        "preflop_3bet:three_bet": [
+          2.5,
+          3.0,
+          3.5,
+          4.0
+        ],
+        "postflop:bet_third": [
+          0.1,
+          0.15,
+          0.2,
+          0.25,
+          0.28,
+          0.33
+        ],
+        "postflop:bet_half": [
+          0.4,
+          0.42,
+          0.5,
+          0.6,
+          0.67
+        ],
+        "postflop:bet_pot": [
+          0.75,
+          0.85,
+          1.0,
+          1.2
+        ],
+        "postflop:all_in": [
+          1.5,
+          2.0
+        ]
+      }
+    },
+    "stress_results": [
+      {
+        "sizing": "standard (control)",
+        "bb_per_100": -75.6,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "min-open 2.0x",
+        "bb_per_100": -74.3,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "small open 2.2x",
+        "bb_per_100": -74.8,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "large open 3.5x",
+        "bb_per_100": -78.3,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "15% pot postflop",
+        "bb_per_100": 2518.8,
+        "mapped_to": "bet_third"
+      },
+      {
+        "sizing": "28% pot postflop",
+        "bb_per_100": 2536.55,
+        "mapped_to": "bet_third"
+      },
+      {
+        "sizing": "42% pot postflop",
+        "bb_per_100": -68.3,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "75% pot postflop",
+        "bb_per_100": 866.95,
+        "mapped_to": "bet_pot"
+      },
+      {
+        "sizing": "120% overbet",
+        "bb_per_100": 619.85,
+        "mapped_to": "bet_pot"
+      },
+      {
+        "sizing": "min-click + 67%",
+        "bb_per_100": -96.45,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "5x open + 200% overbet",
+        "bb_per_100": 24.8,
+        "mapped_to": "all_in"
+      }
+    ]
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "gauntlet": {
+    "AggroBot": {
+      "bb_per_100": 439.6,
+      "showdown_pct": 24.0,
+      "num_hands": 100,
+      "p0_total_bb": 439.6,
+      "phases": {
+        "preflop": 100,
+        "flop": 50,
+        "turn": 39,
+        "river": 34
+      }
+    },
+    "DonkBot": {
+      "bb_per_100": 1551.2,
+      "showdown_pct": 37.0,
+      "num_hands": 100,
+      "p0_total_bb": 1551.2,
+      "phases": {
+        "preflop": 100,
+        "flop": 72,
+        "turn": 60,
+        "river": 49
+      }
+    },
+    "WeirdSizingBot": {
+      "bb_per_100": 1515.85,
+      "showdown_pct": 15.0,
+      "num_hands": 100,
+      "p0_total_bb": 1515.85,
+      "phases": {
+        "preflop": 100,
+        "flop": 55,
+        "turn": 35,
+        "river": 23
+      }
+    },
+    "OverfoldBot": {
+      "bb_per_100": 1.5,
+      "showdown_pct": 39.0,
+      "num_hands": 100,
+      "p0_total_bb": 1.5,
+      "phases": {
+        "preflop": 100,
+        "flop": 66,
+        "turn": 54,
+        "river": 43
+      }
+    },
+    "PerturbBot": {
+      "bb_per_100": -42.6,
+      "showdown_pct": 41.0,
+      "num_hands": 100,
+      "p0_total_bb": -42.6,
+      "phases": {
+        "preflop": 100,
+        "flop": 83,
+        "turn": 62,
+        "river": 48
+      }
+    },
+    "CallStationBot": {
+      "bb_per_100": 1048.25,
+      "showdown_pct": 88.0,
+      "num_hands": 100,
+      "p0_total_bb": 1048.25,
+      "phases": {
+        "preflop": 100,
+        "flop": 98,
+        "turn": 97,
+        "river": 95
+      }
+    },
+    "NitBot": {
+      "bb_per_100": 341.0,
+      "showdown_pct": 33.0,
+      "num_hands": 100,
+      "p0_total_bb": 341.0,
+      "phases": {
+        "preflop": 100,
+        "flop": 64,
+        "turn": 51,
+        "river": 41
+      }
+    },
+    "_summary": {
+      "avg_bb_per_100": 693.54,
+      "best_matchup": "DonkBot",
+      "worst_matchup": "PerturbBot",
+      "strategy_hit_rate": 100.0
+    }
+  }
+}

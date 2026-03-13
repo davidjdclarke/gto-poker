@@ -1,0 +1,163 @@
+{
+  "leakage": {
+    "exploitability": {
+      "mean": 1.4078,
+      "std": 0.0346,
+      "ci_95_low": 1.3686,
+      "ci_95_high": 1.4469,
+      "cv_pct": 2.46,
+      "num_seeds": 3,
+      "samples_per_seed": 500,
+      "values": [
+        1.3975,
+        1.4464,
+        1.3795
+      ],
+      "per_phase": {
+        "preflop": {
+          "mean": 1.6311,
+          "std": 0.0227
+        },
+        "flop": {
+          "mean": 1.3939,
+          "std": 0.033
+        },
+        "turn": {
+          "mean": 1.4125,
+          "std": 0.0394
+        },
+        "river": {
+          "mean": 1.0663,
+          "std": 0.0361
+        }
+      }
+    },
+    "hotspots": {
+      "preflop": [
+        {
+          "key": "preflop:oop:115:55",
+          "regret": 145116.6,
+          "entropy": 1.969
+        },
+        {
+          "key": "preflop:oop:109:55",
+          "regret": 139311.14,
+          "entropy": 1.756
+        },
+        {
+          "key": "preflop:oop:107:55",
+          "regret": 138835.13,
+          "entropy": 1.876
+        },
+        {
+          "key": "preflop:oop:108:55",
+          "regret": 138402.0,
+          "entropy": 1.888
+        },
+        {
+          "key": "preflop:oop:113:55",
+          "regret": 138263.13,
+          "entropy": 1.875
+        }
+      ],
+      "flop": [
+        {
+          "key": "flop:oop:109:55",
+          "regret": 72774.4,
+          "entropy": 2.283
+        },
+        {
+          "key": "flop:oop:111:55",
+          "regret": 69756.98,
+          "entropy": 2.484
+        },
+        {
+          "key": "flop:oop:110:55",
+          "regret": 68067.6,
+          "entropy": 2.38
+        },
+        {
+          "key": "flop:oop:114:55",
+          "regret": 67581.76,
+          "entropy": 2.492
+        },
+        {
+          "key": "flop:oop:106:55",
+          "regret": 65575.24,
+          "entropy": 2.378
+        }
+      ],
+      "turn": [
+        {
+          "key": "turn:ip:106:155",
+          "regret": 60827.15,
+          "entropy": 2.442
+        },
+        {
+          "key": "turn:oop:116:55",
+          "regret": 59711.86,
+          "entropy": 2.418
+        },
+        {
+          "key": "turn:oop:105:55",
+          "regret": 57904.45,
+          "entropy": 2.256
+        },
+        {
+          "key": "turn:ip:109:555",
+          "regret": 57636.97,
+          "entropy": 2.406
+        },
+        {
+          "key": "turn:ip:107:155",
+          "regret": 57490.76,
+          "entropy": 2.516
+        }
+      ],
+      "river": [
+        {
+          "key": "river:ip:104:1",
+          "regret": 8644.89,
+          "entropy": 1.601
+        },
+        {
+          "key": "river:oop:112:55",
+          "regret": 8191.68,
+          "entropy": 1.662
+        },
+        {
+          "key": "river:oop:80:1555",
+          "regret": 8059.55,
+          "entropy": 0.045
+        },
+        {
+          "key": "river:oop:74:1555",
+          "regret": 7986.37,
+          "entropy": 0.04
+        },
+        {
+          "key": "river:oop:92:1555",
+          "regret": 7969.05,
+          "entropy": 0.079
+        }
+      ]
+    },
+    "audit_counts": {
+      "premium_limp": 4,
+      "allin_overuse": 215,
+      "flat_strategies": 286,
+      "frequency_anomalies": 27693
+    },
+    "coverage": {
+      "total_nodes": 251040,
+      "well_visited": 249866,
+      "coverage_pct": 99.5
+    },
+    "phase_distribution": {
+      "preflop": 5520,
+      "flop": 81840,
+      "turn": 81840,
+      "river": 81840
+    }
+  }
+}

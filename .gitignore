@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+venv/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Strategy files (too large for git, 30-176MB each)
+*_strategy.json
+server/gto/strategy.json
+server/gto/strategy_*.json
+strategy_*.json
+
+# Backup strategy files
+*.bak
+
+# Cython generated
+server/gto/cfr_fast.c
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store

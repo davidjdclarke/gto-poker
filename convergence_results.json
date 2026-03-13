@@ -1,0 +1,86 @@
+{
+  "sampling": "external",
+  "max_iterations": 1000000,
+  "results": [
+    {
+      "iterations": 1000,
+      "exploitability": 80.88365238476219,
+      "exploitability_preflop": 95.09326029704835,
+      "num_nodes": 44509,
+      "train_time": 7.350926399230957,
+      "eval_time": 18.19442105293274
+    },
+    {
+      "iterations": 2000,
+      "exploitability": 61.01096291730906,
+      "exploitability_preflop": 61.639472331245855,
+      "num_nodes": 54969,
+      "train_time": 4.520939111709595,
+      "eval_time": 21.26612663269043
+    },
+    {
+      "iterations": 5000,
+      "exploitability": 31.182376425444666,
+      "exploitability_preflop": 32.23794255754805,
+      "num_nodes": 62825,
+      "train_time": 11.577548265457153,
+      "eval_time": 20.84611988067627
+    },
+    {
+      "iterations": 10000,
+      "exploitability": 16.739521908495753,
+      "exploitability_preflop": 18.255133741959238,
+      "num_nodes": 65398,
+      "train_time": 15.456568002700806,
+      "eval_time": 20.5334312915802
+    },
+    {
+      "iterations": 20000,
+      "exploitability": 8.536188586896078,
+      "exploitability_preflop": 7.33801355669652,
+      "num_nodes": 66579,
+      "train_time": 29.833561658859253,
+      "eval_time": 16.076074838638306
+    },
+    {
+      "iterations": 50000,
+      "exploitability": 4.100694411316482,
+      "exploitability_preflop": 4.150404175357108,
+      "num_nodes": 67375,
+      "train_time": 76.22257208824158,
+      "eval_time": 17.7683424949646
+    },
+    {
+      "iterations": 100000,
+      "exploitability": 2.2744849242622607,
+      "exploitability_preflop": 1.950287271971083,
+      "num_nodes": 67766,
+      "train_time": 124.6226098537445,
+      "eval_time": 15.728766918182373
+    },
+    {
+      "iterations": 200000,
+      "exploitability": 1.5163292738931415,
+      "exploitability_preflop": 1.390518556098476,
+      "num_nodes": 67915,
+      "train_time": 206.69958353042603,
+      "eval_time": 11.295905351638794
+    },
+    {
+      "iterations": 500000,
+      "exploitability": 1.0588175208075283,
+      "exploitability_preflop": 1.212543843724527,
+      "num_nodes": 67936,
+      "train_time": 344.25982546806335,
+      "eval_time": 9.986491203308105
+    },
+    {
+      "iterations": 1000000,
+      "exploitability": 0.8728762755850441,
+      "exploitability_preflop": 0.8911533647306863,
+      "num_nodes": 67936,
+      "train_time": 536.9694602489471,
+      "eval_time": 9.765148639678955
+    }
+  ]
+}

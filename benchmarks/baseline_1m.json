@@ -1,0 +1,53 @@
+{
+  "name": "baseline_1m",
+  "description": "Frozen baseline: 1M iteration CFR+ with 88 buckets (8 equity x 11 hand types), no position encoding",
+  "date": "2026-03-10",
+  "strategy_file": "strategy_baseline_1m.json",
+  "strategy_version": 4,
+  "training": {
+    "iterations": 1000000,
+    "sampling": "external",
+    "averaging_delay_ratio": 0.25,
+    "total_train_time_s": 537.0,
+    "ms_per_iteration": 2.2
+  },
+  "abstraction": {
+    "equity_buckets": 8,
+    "hand_types": 11,
+    "total_buckets": 88,
+    "position_encoding": false,
+    "hand_type_labels": [
+      "PREMIUM_PAIR", "HIGH_PAIR", "MID_PAIR", "LOW_PAIR",
+      "BROADWAY", "SUITED_ACE", "SUITED_CONNECTOR", "SUITED_GAPPER",
+      "OFFSUIT_ACE", "OFFSUIT_BROADWAY", "TRASH"
+    ]
+  },
+  "strategy_stats": {
+    "num_nodes": 67936,
+    "strategy_file_bytes": 10650051
+  },
+  "exploitability": {
+    "all_phases_500_samples": 0.8729,
+    "preflop_only_500_samples": 0.8912,
+    "note": "Monte Carlo BR with 500 samples, CV ~1.9%"
+  },
+  "variance_study": {
+    "at_5k_iters": {
+      "500_samples": {"mean": 29.76, "std": 0.57, "cv_pct": 1.92},
+      "2000_samples": {"mean": 29.10, "std": 0.51, "cv_pct": 1.75}
+    },
+    "verdict": "500 samples sufficient, <2% noise"
+  },
+  "convergence_curve": [
+    {"iterations": 1000, "exploitability": 80.88, "nodes": 44509},
+    {"iterations": 2000, "exploitability": 61.01, "nodes": 54969},
+    {"iterations": 5000, "exploitability": 31.18, "nodes": 62825},
+    {"iterations": 10000, "exploitability": 16.74, "nodes": 65398},
+    {"iterations": 20000, "exploitability": 8.54, "nodes": 66579},
+    {"iterations": 50000, "exploitability": 4.10, "nodes": 67375},
+    {"iterations": 100000, "exploitability": 2.27, "nodes": 67766},
+    {"iterations": 200000, "exploitability": 1.52, "nodes": 67915},
+    {"iterations": 500000, "exploitability": 1.06, "nodes": 67936},
+    {"iterations": 1000000, "exploitability": 0.87, "nodes": 67936}
+  ]
+}
