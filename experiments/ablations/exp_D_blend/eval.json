@@ -1,0 +1,135 @@
+{
+  "behavioral": {
+    "preflop_premium": {
+      "name": "preflop_premium",
+      "num_nodes": 6,
+      "action_dist": {
+        "FOLD": 0.0051,
+        "CHECK_CALL": 0.7499,
+        "OPEN_RAISE": 0.1519,
+        "ALL_IN": 0.0931
+      },
+      "entropy": 0.7510945248330732,
+      "fold_pct": 0.5,
+      "call_pct": 75.0,
+      "raise_pct": 24.5,
+      "delta": {
+        "FOLD": 0.0,
+        "CHECK_CALL": 0.0,
+        "OPEN_RAISE": 0.0,
+        "ALL_IN": 0.0
+      }
+    },
+    "jam_over_open": {
+      "name": "jam_over_open",
+      "num_nodes": 120,
+      "action_dist": {
+        "FOLD": 0.5685,
+        "CHECK_CALL": 0.3417,
+        "THREE_BET": 0.0445,
+        "ALL_IN": 0.0452
+      },
+      "entropy": 0.4238350445488459,
+      "fold_pct": 56.9,
+      "call_pct": 34.2,
+      "raise_pct": 9.0,
+      "delta": {
+        "FOLD": 0.0,
+        "CHECK_CALL": 0.0,
+        "THREE_BET": 0.0,
+        "ALL_IN": 0.0
+      }
+    },
+    "flop_low_eq_probe": {
+      "name": "flop_low_eq_probe",
+      "num_nodes": 30,
+      "action_dist": {
+        "CHECK_CALL": 0.7383,
+        "DONK_SMALL": 0.15,
+        "DONK_MEDIUM": 0.053,
+        "BET_TWO_THIRDS_POT": 0.0218,
+        "BET_POT": 0.0276,
+        "ALL_IN": 0.0093
+      },
+      "entropy": 0.9957032511686468,
+      "fold_pct": 0.0,
+      "call_pct": 73.8,
+      "raise_pct": 26.2,
+      "delta": {
+        "CHECK_CALL": 0.0,
+        "DONK_SMALL": 0.0,
+        "DONK_MEDIUM": 0.0,
+        "BET_TWO_THIRDS_POT": 0.0,
+        "BET_POT": 0.0,
+        "ALL_IN": 0.0
+      }
+    },
+    "river_bluff": {
+      "name": "river_bluff",
+      "num_nodes": 76681,
+      "action_dist": {
+        "FOLD": 0.9782,
+        "CHECK_CALL": 0.0128,
+        "BET_THIRD_POT": 0.0021,
+        "BET_HALF_POT": 0.0016,
+        "BET_TWO_THIRDS_POT": 0.0015,
+        "BET_POT": 0.0013,
+        "BET_OVERBET": 0.0013,
+        "ALL_IN": 0.0011
+      },
+      "entropy": 0.15637448450036842,
+      "fold_pct": 97.8,
+      "call_pct": 1.3,
+      "raise_pct": 0.9,
+      "delta": {
+        "FOLD": 0.0,
+        "CHECK_CALL": 0.0,
+        "BET_THIRD_POT": 0.0,
+        "BET_HALF_POT": 0.0,
+        "BET_TWO_THIRDS_POT": 0.0,
+        "BET_POT": 0.0,
+        "BET_OVERBET": 0.0,
+        "ALL_IN": 0.0
+      }
+    },
+    "river_thin_value": {
+      "name": "river_thin_value",
+      "num_nodes": 52173,
+      "action_dist": {
+        "CHECK_CALL": 0.0391,
+        "BET_THIRD_POT": 0.0022,
+        "BET_HALF_POT": 0.0016,
+        "BET_TWO_THIRDS_POT": 0.0014,
+        "BET_POT": 0.0012,
+        "BET_OVERBET": 0.0011,
+        "ALL_IN": 0.001,
+        "FOLD": 0.9525
+      },
+      "entropy": 0.2609088748882278,
+      "fold_pct": 95.2,
+      "call_pct": 3.9,
+      "raise_pct": 0.8,
+      "delta": {
+        "CHECK_CALL": 0.0,
+        "BET_THIRD_POT": 0.0,
+        "BET_HALF_POT": 0.0,
+        "BET_TWO_THIRDS_POT": 0.0,
+        "BET_POT": 0.0,
+        "BET_OVERBET": 0.0,
+        "ALL_IN": 0.0,
+        "FOLD": 0.0
+      }
+    },
+    "overbet_defense": {
+      "name": "overbet_defense",
+      "num_nodes": 0,
+      "action_dist": {},
+      "entropy": 0.0,
+      "fold_pct": 0.0,
+      "call_pct": 0.0,
+      "raise_pct": 0.0,
+      "delta": {}
+    }
+  },
+  "_eval_time_s": 34.1
+}

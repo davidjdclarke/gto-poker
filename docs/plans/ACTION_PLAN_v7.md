@@ -2,24 +2,38 @@
 
 ## Current Status
 
-**v7 is stable and deployed.** Exploitability 1.2822 bb/100, 1,047,504 nodes, 100% coverage.
+**v7 67M trained and evaluated (2026-03-13).** Exploitability improved to 1.2311 bb/100
+(from 1.2822 at 50M), 1,052,718 nodes, 100% coverage.
 
-Major regressions from the failed v7 attempt 1 & 2 (1.82–1.87) are resolved. Two previously
-critical issues are fixed: CallStation went from -463 → **+439.5 bb/100** and NitBot from
--19 → **+235.9 bb/100**.
+However, **gauntlet regressed significantly** — average went from -6.7 → **-226.2 bb/100**.
+NitBot and CallStationBot both flipped from large wins to large losses. River bluff ratio
+dropped from 35.1% → 27.3%. The additional 17M iterations improved theoretical convergence
+but made the strategy too passive in practice.
+
+### 67M vs 50M Comparison
+
+| Metric | 50M | 67M | Delta |
+|--------|-----|-----|-------|
+| Exploitability | 1.2822 | 1.2311 | -0.05 (better) |
+| Gauntlet avg | -6.7 | -226.2 | -219.5 (worse) |
+| NitBot | +235.9 | -409.3 | -645.2 (regressed) |
+| CallStationBot | +439.5 | -437.0 | -876.5 (regressed) |
+| OverfoldBot | -291.4 | +107.8 | +399.2 (fixed) |
+| River bluff ratio | 35.1% | 27.3% | -7.8pp (too low) |
+| Flat strategies | 1,334 | 1,035 | -299 (better) |
+| Frequency anomalies | 65,814 | 17,669 | -48,145 (better) |
+
+**Key finding:** More iterations does NOT equal better practical play. The solver is
+over-converging toward a tight, passive strategy that fails to exploit weak opponents.
+The 50M checkpoint was likely closer to a practical optimum for the current abstraction.
 
 ---
 
 ## Priority 1 — Immediate (no retrain, do now)
 
-### 1A. OverfoldBot -291.4 bb/100 — Partially Addressed (see 1C)
-**Impact: High.** GTO should crush a passive folder, not lose to it. The opponent modeling
-layer (1C) directly addresses this by detecting high fold rates and increasing bluff/probe
-frequencies. Run gauntlet post-1C to measure improvement.
-
-If still negative after 1C:
-- Query flop IP strategy after OOP check: does the solver check back >50% with strong hands?
-- This would indicate a training gap requiring the 3x phase schedule retrain (2B)
+### 1A. ~~OverfoldBot -291.4 bb/100~~ ✓ FIXED at 67M
+**Was -291.4 at 50M, now +107.8 at 67M.** The additional training iterations resolved the
+under-betting against passive folders without any code changes. No further action needed.
 
 ### 1B. ~~Position Bug in GTO Suggestions (Multiplayer)~~ ✓ FIXED
 **Was:** `_compute_gto_suggestions_sync` in `server/game.py` derived `position` from
@@ -30,9 +44,7 @@ history got OOP strategy, causing fold recommendations on strong hands like AQs.
 **Fix applied (2026-03-12):** Line ~535 changed to `position = 'ip' if is_in_position else 'oop'`.
 
 ### 1C. Opponent-Adaptive Bluff Frequency ✓ IMPLEMENTED
-**Impact: High.** Addresses OverfoldBot -291.4 (GTO not exploiting passive folders) and
-CallStationBot stability. Also improves live game quality — GTO suggestions now adapt to
-the table's tendencies.
+**Impact: High.** Originally addressed OverfoldBot -291.4 and CallStationBot stability.
 
 **Approach implemented:**
 - New `server/gto/opponent_model.py` — `OpponentProfile(window=50, min_samples=15)`
@@ -43,17 +55,22 @@ the table's tendencies.
 - Only adjusts bet actions (2,3,4,9,10,11,12). FOLD, CHECK_CALL, ALL_IN untouched.
 - Kicks in only after 15+ decisions per phase (no wild early adjustments).
 
+**67M update:** OverfoldBot is now fixed (+107.8) even without opponent modeling active in
+the eval harness gauntlet — the training itself resolved it. However, opponent modeling
+is now **even more critical** given the 67M regressions against NitBot (-409.3) and
+CallStationBot (-437.0). The base strategy is too passive at 67M; the adaptive layer
+should compensate by boosting bluffs vs stations and aggression vs nits.
+
 **Files modified:**
 - `server/gto/opponent_model.py` — new
 - `eval_harness/match_engine.py` — GTOAgent accepts `opponent_profile`, HeadsUpMatch records actions
 - `run_eval_harness.py` — fresh OpponentProfile per gauntlet matchup
 - `server/game.py` — session-level profile on Game object, AI actions recorded, suggestions adjusted
 
-**Priority 3D** (opponent modeling) from below has been pulled up and implemented.
-
-### 1D. WeirdSizingBot Translation (-852.7)
-**Impact: High.** The 120% overbet scenario alone loses -1305 bb/100 raw. The GTO agent
-responds to a 120% pot bet using the `bet_overbet` (1.25x) node, which is undertrained.
+### 1D. WeirdSizingBot Translation (-952.4 at 67M, was -852.7 at 50M)
+**Impact: High — getting worse with more training.** The 120% overbet scenario alone loses
+-1305 bb/100 raw. The GTO agent responds to a 120% pot bet using the `bet_overbet` (1.25x)
+node, which is undertrained. This regressed further at 67M (-952.4 vs -852.7).
 
 - When facing an overbet, consider bypassing the undertrained node and applying a
   heuristic: fold EQ0-2, call EQ3-5, raise EQ6+ — then blend with trained strategy at
@@ -185,8 +202,12 @@ river), EQ0-3 (not just EQ0-1), and min_samples guard. Full details in
 - **Do not change the 3x phase schedule without also updating cfr_fast.pyx** — Python
   `PHASE_SCHEDULE` is dead code when Cython is available. Must change both.
 - **Do not change the bridge default back to `conservative`** — with healthy river bluff
-  ratios (35.1%), conservative's 15% bet→check bleed now hurts value betting. Only
-  appropriate if river over-bluffing returns.
+  ratios, conservative's 15% bet→check bleed now hurts value betting. Only appropriate if
+  river over-bluffing returns.
+- **Do not blindly train more iterations** — 67M showed that more iterations can degrade
+  gauntlet performance despite improving exploitability. The solver over-converges toward
+  passive play. Either fix the abstraction or use early stopping based on gauntlet metrics,
+  not just exploitability.
 
 ---
 
@@ -207,23 +228,25 @@ Target exploitability: < 1.20 (improvement from 3x schedule + tighter dampening)
 
 ## Metrics Baseline (v7, for comparison)
 
-| Metric | v7 Value |
-|--------|---------|
-| Exploitability | 1.2822 bb/100 |
-| Preflop | 1.05 |
-| Flop | 1.42 |
-| Turn | 1.44 |
-| River | 1.17 |
-| AggroBot | +365.6 |
-| OverfoldBot | -291.4 |
-| DonkBot | +266.5 |
-| WeirdSizingBot | -852.7 |
-| PerturbBot | -210.4 |
-| NitBot | +235.9 |
-| CallStationBot | +439.5 |
-| Gauntlet avg | -6.7 |
-| Bridge best (nearest) | +276.9 |
-| Flat strategies | 1,334 |
-| All-in overuse | 520 |
-| Frequency anomalies | 65,814 |
-| River bluff ratio | 35.1% (HEALTHY) |
+| Metric | 50M | 67M | Trend |
+|--------|-----|-----|-------|
+| Exploitability | 1.2822 | 1.2311 | better |
+| Preflop | 1.05 | 1.02 | better |
+| Flop | 1.42 | 1.30 | better |
+| Turn | 1.44 | 1.34 | better |
+| River | 1.17 | 1.13 | better |
+| AggroBot | +365.6 | +179.4 | worse |
+| OverfoldBot | -291.4 | +107.8 | **fixed** |
+| DonkBot | +266.5 | +293.9 | better |
+| WeirdSizingBot | -852.7 | -952.4 | worse |
+| PerturbBot | -210.4 | -366.0 | worse |
+| NitBot | +235.9 | -409.3 | **regressed** |
+| CallStationBot | +439.5 | -437.0 | **regressed** |
+| Gauntlet avg | -6.7 | -226.2 | **regressed** |
+| Bridge best (nearest) | +276.9 | +122.5 | worse |
+| Flat strategies | 1,334 | 1,035 | better |
+| All-in overuse | 520 | 458 | better |
+| Frequency anomalies | 65,814 | 17,669 | better |
+| River bluff ratio | 35.1% | 27.3% | lower |
+
+Full eval details: `docs/results/v7_67M_20260313.md`

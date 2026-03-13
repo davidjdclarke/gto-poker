@@ -365,6 +365,7 @@ def run_translation_ab(trainer: CFRTrainer, num_hands: int = 500,
         "conservative": ConservativeGTOAgent(trainer),
         "stochastic": StochasticGTOAgent(trainer),
         "resolve": ResolveGTOAgent(trainer),
+        "blend": GTOAgent(trainer, name="GTO-Blend", mapping="blend"),
     }
 
     # Test opponents: use a subset for speed

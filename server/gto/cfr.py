@@ -40,7 +40,9 @@ except ImportError:
 
 STRATEGY_VERSION = 6  # v6: 2/3pot, overbet, donk bets, all-in audit
 
-def _parallel_worker(worker_id, n_iters, start_iter, avg_delay, seed):
+def _parallel_worker(worker_id, n_iters, start_iter, avg_delay, seed,
+                     phase_schedule_mode=1, allin_dampen_mode=1,
+                     adaptive_averaging=0):
     """Worker function for parallel CFR training.
 
     Runs in a forked child process. The node_pool is in shared mmap memory,
@@ -50,13 +52,19 @@ def _parallel_worker(worker_id, n_iters, start_iter, avg_delay, seed):
     _cfr_fast.set_no_create_mode(True)
     _cfr_fast.set_worker_id(worker_id)
     _cfr_fast.train_fast(n_iters, start_iter=start_iter,
-                         averaging_delay=avg_delay, seed=seed)
+                         averaging_delay=avg_delay, seed=seed,
+                         phase_schedule_mode=phase_schedule_mode,
+                         allin_dampen_mode=allin_dampen_mode,
+                         adaptive_averaging=adaptive_averaging)
 
 PHASES = ['preflop', 'flop', 'turn', 'river']
 
-# Weighted phase schedule: flop/turn get 3x training per cycle.
-# Matches the Cython hot path (cfr_fast.pyx train_fast also uses 3x).
-PHASE_SCHEDULE = [0, 1, 1, 1, 2, 2, 2, 3]  # indices into PHASES
+# Phase schedules (configurable for ablation)
+PHASE_SCHEDULE_2X = [0, 1, 1, 2, 2, 3]        # original 2x flop/turn
+PHASE_SCHEDULE_3X = [0, 1, 1, 1, 2, 2, 2, 3]  # current default 3x flop/turn
+
+# Default: 3x schedule. Matches the Cython hot path.
+PHASE_SCHEDULE = PHASE_SCHEDULE_3X
 
 
 class CFRNode:
@@ -144,6 +152,9 @@ class CFRTrainer:
 
     def train(self, num_iterations: int = 10000,
               averaging_delay: int = 0,
+              phase_schedule_mode: int = 1,
+              allin_dampen_mode: int = 1,
+              adaptive_averaging: int = 0,
               sampling: str = 'external',
               progress_callback=None,
               chunk_size: int = 5000,
@@ -172,13 +183,22 @@ class CFRTrainer:
                 self._train_cython_parallel(num_iterations, averaging_delay,
                                             num_workers=num_workers,
                                             progress_callback=progress_callback,
-                                            chunk_size=chunk_size)
+                                            chunk_size=chunk_size,
+                                            phase_schedule_mode=phase_schedule_mode,
+                                            allin_dampen_mode=allin_dampen_mode,
+                                            adaptive_averaging=adaptive_averaging)
             else:
                 self._train_cython(num_iterations, averaging_delay,
                                    progress_callback=progress_callback,
-                                   chunk_size=chunk_size)
+                                   chunk_size=chunk_size,
+                                   phase_schedule_mode=phase_schedule_mode,
+                                   allin_dampen_mode=allin_dampen_mode,
+                                   adaptive_averaging=adaptive_averaging)
             return
 
+        # Python fallback: store config for _cfr_single_street access
+        self._allin_dampen_mode = allin_dampen_mode
+        schedule = PHASE_SCHEDULE_3X if phase_schedule_mode == 1 else PHASE_SCHEDULE_2X
         start_iter = self.iterations
 
         for i in range(num_iterations):
@@ -186,8 +206,7 @@ class CFRTrainer:
             weight = max(t - averaging_delay, 0)
 
             # Train each street with correlated buckets
-            # Weighted schedule: flop/turn get 2x iterations
-            for phase_idx in PHASE_SCHEDULE:
+            for phase_idx in schedule:
                 phase = PHASES[phase_idx]
                 buckets_p0 = self._sample_street_buckets()
                 buckets_p1 = self._sample_street_buckets()
@@ -210,13 +229,18 @@ class CFRTrainer:
                 print(f"CFR+ iteration {i + 1}/{num_iterations}")
 
     def _train_cython(self, num_iterations: int, averaging_delay: int,
-                      progress_callback=None, chunk_size: int = 5000):
+                      progress_callback=None, chunk_size: int = 5000,
+                      phase_schedule_mode: int = 1,
+                      allin_dampen_mode: int = 1,
+                      adaptive_averaging: int = 0):
         """Run training using Cython-accelerated CFR.
 
         Args:
             progress_callback: Optional callable(iterations_done, total, nodes)
                                called after each chunk for progress reporting.
             chunk_size: Number of iterations per chunk (controls update frequency).
+            phase_schedule_mode: 0=2x, 1=3x (default).
+            allin_dampen_mode: 0=old, 1=new (default).
         """
         # Initialize Cython node pool
         _cfr_fast.init_pool()
@@ -235,6 +259,9 @@ class CFRTrainer:
                 start_iter=self.iterations + done,
                 averaging_delay=averaging_delay,
                 seed=seed + done,
+                phase_schedule_mode=phase_schedule_mode,
+                allin_dampen_mode=allin_dampen_mode,
+                adaptive_averaging=adaptive_averaging,
             )
             done += batch
 
@@ -247,7 +274,10 @@ class CFRTrainer:
 
     def _train_cython_parallel(self, num_iterations: int, averaging_delay: int,
                                num_workers: int = 4, warmup_frac: float = 0.005,
-                               progress_callback=None, chunk_size: int = 5000):
+                               progress_callback=None, chunk_size: int = 5000,
+                               phase_schedule_mode: int = 1,
+                               allin_dampen_mode: int = 1,
+                               adaptive_averaging: int = 0):
         """Parallel CFR+ using shared memory and multiprocessing.
 
         Phase 1 (warmup): Single-threaded training to discover all game tree
@@ -287,6 +317,9 @@ class CFRTrainer:
                 start_iter=self.iterations + done,
                 averaging_delay=averaging_delay,
                 seed=seed + done,
+                phase_schedule_mode=phase_schedule_mode,
+                allin_dampen_mode=allin_dampen_mode,
+                adaptive_averaging=adaptive_averaging,
             )
             done += batch
             if progress_callback:
@@ -311,7 +344,9 @@ class CFRTrainer:
 
             p = multiprocessing.Process(
                 target=_parallel_worker,
-                args=(w, w_iters, start, averaging_delay, w_seed))
+                args=(w, w_iters, start, averaging_delay, w_seed,
+                      phase_schedule_mode, allin_dampen_mode,
+                      adaptive_averaging))
             processes.append(p)
             p.start()
 
@@ -515,10 +550,15 @@ class CFRTrainer:
         node_utility = strategy @ action_utilities
         regrets = action_utilities - node_utility
 
-        # Dampen all-in regrets for cold jams only (rc==0), stronger factor.
+        # All-in dampening (configurable for ablation)
+        dampen_mode = getattr(self, '_allin_dampen_mode', 1)
         for i, action in enumerate(actions):
-            if action == Action.ALL_IN and raise_count == 0:
-                regrets[i] *= 0.5
+            if dampen_mode == 1:
+                if action == Action.ALL_IN and raise_count == 0:
+                    regrets[i] *= 0.5
+            else:
+                if action == Action.ALL_IN and raise_count < 2:
+                    regrets[i] *= 0.7
 
         node.update_regrets(regrets)
         node.accumulate_strategy(strategy, weight)

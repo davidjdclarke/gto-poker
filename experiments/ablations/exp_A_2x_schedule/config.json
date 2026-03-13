@@ -1,0 +1,11 @@
+{
+  "name": "exp_A_2x_schedule",
+  "iterations": 50000000,
+  "workers": 6,
+  "checkpoint_interval": 0,
+  "config_overrides": {
+    "phase_schedule_mode": 0
+  },
+  "strategy_path": null,
+  "eval_only": false
+}

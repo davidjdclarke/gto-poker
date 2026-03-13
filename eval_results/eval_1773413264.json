@@ -1,0 +1,588 @@
+{
+  "gauntlet": {
+    "AggroBot": {
+      "bb_per_100": 179.43,
+      "showdown_pct": 16.6,
+      "num_hands": 500,
+      "p0_total_bb": 897.15,
+      "phases": {
+        "preflop": 500,
+        "flop": 223,
+        "turn": 164,
+        "river": 119
+      }
+    },
+    "OverfoldBot": {
+      "bb_per_100": 107.8,
+      "showdown_pct": 33.8,
+      "num_hands": 500,
+      "p0_total_bb": 539.0,
+      "phases": {
+        "preflop": 500,
+        "flop": 349,
+        "turn": 253,
+        "river": 202
+      }
+    },
+    "WeirdSizingBot": {
+      "bb_per_100": -952.38,
+      "showdown_pct": 20.6,
+      "num_hands": 500,
+      "p0_total_bb": -4761.9,
+      "phases": {
+        "preflop": 500,
+        "flop": 278,
+        "turn": 191,
+        "river": 143
+      }
+    },
+    "DonkBot": {
+      "bb_per_100": 293.91,
+      "showdown_pct": 43.8,
+      "num_hands": 500,
+      "p0_total_bb": 1469.55,
+      "phases": {
+        "preflop": 500,
+        "flop": 358,
+        "turn": 310,
+        "river": 267
+      }
+    },
+    "NitBot": {
+      "bb_per_100": -409.34,
+      "showdown_pct": 30.2,
+      "num_hands": 500,
+      "p0_total_bb": -2046.7,
+      "phases": {
+        "preflop": 500,
+        "flop": 316,
+        "turn": 256,
+        "river": 214
+      }
+    },
+    "PerturbBot": {
+      "bb_per_100": -365.98,
+      "showdown_pct": 38.8,
+      "num_hands": 500,
+      "p0_total_bb": -1829.9,
+      "phases": {
+        "preflop": 500,
+        "flop": 436,
+        "turn": 344,
+        "river": 267
+      }
+    },
+    "CallStationBot": {
+      "bb_per_100": -436.99,
+      "showdown_pct": 87.6,
+      "num_hands": 500,
+      "p0_total_bb": -2184.95,
+      "phases": {
+        "preflop": 500,
+        "flop": 491,
+        "turn": 478,
+        "river": 462
+      }
+    },
+    "_summary": {
+      "avg_bb_per_100": -226.22,
+      "best_matchup": "DonkBot",
+      "worst_matchup": "WeirdSizingBot",
+      "strategy_hit_rate": 93.8
+    }
+  },
+  "offtree": {
+    "mapping": {
+      "preflop": [
+        {
+          "label": "min-open 2x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "small open 2.2x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "standard 2.5x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "large open 3x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "oversize 3.5x",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "5x open",
+          "mapped": "open_raise"
+        },
+        {
+          "label": "small 3bet 2.5x",
+          "mapped": "three_bet"
+        },
+        {
+          "label": "standard 3bet 3x",
+          "mapped": "three_bet"
+        },
+        {
+          "label": "large 3bet 3.5x",
+          "mapped": "three_bet"
+        },
+        {
+          "label": "oversize 3bet 4x",
+          "mapped": "three_bet"
+        }
+      ],
+      "postflop": [
+        {
+          "label": "10% pot (micro)",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "15% pot",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "20% pot",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "25% pot",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "28% pot",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "33% pot (on-tree)",
+          "mapped": "bet_third"
+        },
+        {
+          "label": "40% pot",
+          "mapped": "bet_half"
+        },
+        {
+          "label": "42% pot",
+          "mapped": "bet_half"
+        },
+        {
+          "label": "50% pot (on-tree)",
+          "mapped": "bet_half"
+        },
+        {
+          "label": "60% pot",
+          "mapped": "bet_two_thirds"
+        },
+        {
+          "label": "67% pot",
+          "mapped": "bet_two_thirds"
+        },
+        {
+          "label": "75% pot",
+          "mapped": "bet_two_thirds"
+        },
+        {
+          "label": "85% pot",
+          "mapped": "bet_pot"
+        },
+        {
+          "label": "100% pot (on-tree)",
+          "mapped": "bet_pot"
+        },
+        {
+          "label": "120% pot (overbet)",
+          "mapped": "bet_overbet"
+        },
+        {
+          "label": "150% pot (large overbet)",
+          "mapped": "bet_overbet"
+        },
+        {
+          "label": "200% pot (massive overbet)",
+          "mapped": "bet_overbet"
+        },
+        {
+          "label": "min-raise (20 into 100)",
+          "mapped": "bet_third"
+        }
+      ],
+      "collisions": {
+        "preflop:open_raise": [
+          2.0,
+          2.2,
+          2.5,
+          3.0,
+          3.5,
+          5.0
+        ],
+        "preflop_3bet:three_bet": [
+          2.5,
+          3.0,
+          3.5,
+          4.0
+        ],
+        "postflop:bet_third": [
+          0.1,
+          0.15,
+          0.2,
+          0.25,
+          0.28,
+          0.33
+        ],
+        "postflop:bet_half": [
+          0.4,
+          0.42,
+          0.5
+        ],
+        "postflop:bet_two_thirds": [
+          0.6,
+          0.67,
+          0.75
+        ],
+        "postflop:bet_pot": [
+          0.85,
+          1.0
+        ],
+        "postflop:bet_overbet": [
+          1.2,
+          1.5,
+          2.0
+        ]
+      }
+    },
+    "stress_results": [
+      {
+        "sizing": "standard (control)",
+        "bb_per_100": -986.75,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "min-open 2.0x",
+        "bb_per_100": -535.02,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "small open 2.2x",
+        "bb_per_100": -469.66,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "large open 3.5x",
+        "bb_per_100": 494.38,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "15% pot postflop",
+        "bb_per_100": -1611.02,
+        "mapped_to": "bet_third"
+      },
+      {
+        "sizing": "28% pot postflop",
+        "bb_per_100": -815.85,
+        "mapped_to": "bet_third"
+      },
+      {
+        "sizing": "42% pot postflop",
+        "bb_per_100": -709.06,
+        "mapped_to": "bet_half"
+      },
+      {
+        "sizing": "75% pot postflop",
+        "bb_per_100": 175.93,
+        "mapped_to": "bet_two_thirds"
+      },
+      {
+        "sizing": "120% overbet",
+        "bb_per_100": -55.01,
+        "mapped_to": "bet_overbet"
+      },
+      {
+        "sizing": "min-click + 67%",
+        "bb_per_100": 240.63,
+        "mapped_to": "bet_two_thirds"
+      },
+      {
+        "sizing": "5x open + 200% overbet",
+        "bb_per_100": -1425.0,
+        "mapped_to": "bet_overbet"
+      }
+    ]
+  },
+  "bridge": {
+    "results": [
+      {
+        "mapping": "nearest",
+        "opponent": "AggroBot",
+        "bb_per_100": 291.19
+      },
+      {
+        "mapping": "nearest",
+        "opponent": "CallStationBot",
+        "bb_per_100": -387.7
+      },
+      {
+        "mapping": "nearest",
+        "opponent": "WeirdSizingBot",
+        "bb_per_100": 464.02
+      },
+      {
+        "mapping": "conservative",
+        "opponent": "AggroBot",
+        "bb_per_100": 40.54
+      },
+      {
+        "mapping": "conservative",
+        "opponent": "CallStationBot",
+        "bb_per_100": 733.74
+      },
+      {
+        "mapping": "conservative",
+        "opponent": "WeirdSizingBot",
+        "bb_per_100": -554.95
+      },
+      {
+        "mapping": "stochastic",
+        "opponent": "AggroBot",
+        "bb_per_100": 297.19
+      },
+      {
+        "mapping": "stochastic",
+        "opponent": "CallStationBot",
+        "bb_per_100": 819.88
+      },
+      {
+        "mapping": "stochastic",
+        "opponent": "WeirdSizingBot",
+        "bb_per_100": -1045.59
+      },
+      {
+        "mapping": "resolve",
+        "opponent": "AggroBot",
+        "bb_per_100": 9.91
+      },
+      {
+        "mapping": "resolve",
+        "opponent": "CallStationBot",
+        "bb_per_100": -66.68
+      },
+      {
+        "mapping": "resolve",
+        "opponent": "WeirdSizingBot",
+        "bb_per_100": -1064.97
+      }
+    ]
+  },
+  "leakage": {
+    "exploitability": {
+      "mean": 1.2311,
+      "std": 0.0556,
+      "ci_95_low": 1.1682,
+      "ci_95_high": 1.294,
+      "cv_pct": 4.52,
+      "num_seeds": 3,
+      "samples_per_seed": 500,
+      "values": [
+        1.2846,
+        1.2351,
+        1.1736
+      ],
+      "per_phase": {
+        "preflop": {
+          "mean": 1.0173,
+          "std": 0.0119
+        },
+        "flop": {
+          "mean": 1.2982,
+          "std": 0.0544
+        },
+        "turn": {
+          "mean": 1.34,
+          "std": 0.1354
+        },
+        "river": {
+          "mean": 1.1292,
+          "std": 0.0493
+        }
+      }
+    },
+    "hotspots": {
+      "preflop": [
+        {
+          "key": "preflop:oop:112:55",
+          "regret": 248264.09,
+          "entropy": 1.846
+        },
+        {
+          "key": "preflop:oop:119:55",
+          "regret": 246143.73,
+          "entropy": 1.661
+        },
+        {
+          "key": "preflop:oop:110:55",
+          "regret": 246069.94,
+          "entropy": 1.892
+        },
+        {
+          "key": "preflop:oop:113:55",
+          "regret": 237924.29,
+          "entropy": 1.84
+        },
+        {
+          "key": "preflop:oop:107:55",
+          "regret": 232780.12,
+          "entropy": 1.878
+        }
+      ],
+      "flop": [
+        {
+          "key": "flop:oop:117:55",
+          "regret": 270842.81,
+          "entropy": 2.516
+        },
+        {
+          "key": "flop:oop:119:55",
+          "regret": 223485.52,
+          "entropy": 2.783
+        },
+        {
+          "key": "flop:oop:115:55",
+          "regret": 214871.32,
+          "entropy": 2.905
+        },
+        {
+          "key": "flop:ip:113:155",
+          "regret": 205190.56,
+          "entropy": 2.762
+        },
+        {
+          "key": "flop:oop:105:55",
+          "regret": 202556.4,
+          "entropy": 2.821
+        }
+      ],
+      "turn": [
+        {
+          "key": "turn:oop:110:55",
+          "regret": 256510.68,
+          "entropy": 2.616
+        },
+        {
+          "key": "turn:ip:108:155",
+          "regret": 247268.18,
+          "entropy": 2.861
+        },
+        {
+          "key": "turn:ip:119:155",
+          "regret": 243092.36,
+          "entropy": 2.782
+        },
+        {
+          "key": "turn:oop:111:55",
+          "regret": 242877.07,
+          "entropy": 2.782
+        },
+        {
+          "key": "turn:oop:116:55",
+          "regret": 239847.52,
+          "entropy": 2.722
+        }
+      ],
+      "river": [
+        {
+          "key": "river:oop:108:55",
+          "regret": 10545.03,
+          "entropy": 1.789
+        },
+        {
+          "key": "river:oop:99:1555",
+          "regret": 9584.33,
+          "entropy": 0.754
+        },
+        {
+          "key": "river:ip:95:5",
+          "regret": 8841.57,
+          "entropy": 1.021
+        },
+        {
+          "key": "river:ip:88:555",
+          "regret": 8593.7,
+          "entropy": 0.0
+        },
+        {
+          "key": "river:oop:103:55",
+          "regret": 8424.03,
+          "entropy": 0.8
+        }
+      ]
+    },
+    "audit_counts": {
+      "premium_limp": 4,
+      "allin_overuse": 458,
+      "flat_strategies": 1035,
+      "frequency_anomalies": 17669
+    },
+    "river_bluff": {
+      "overall_bluff_ratio": 0.2731,
+      "diagnosis": "HEALTHY",
+      "by_sizing": {
+        "bet_third": {
+          "bluff_ratio": 0.1781,
+          "value_weight": 322211412170558.0,
+          "bluff_weight": 69801419362893.0
+        },
+        "bet_half": {
+          "bluff_ratio": 0.3491,
+          "value_weight": 48615900002085.0,
+          "bluff_weight": 26069742879898.0
+        },
+        "bet_two_thirds": {
+          "bluff_ratio": 0.3351,
+          "value_weight": 30611367114337.0,
+          "bluff_weight": 15426105805347.0
+        },
+        "bet_pot": {
+          "bluff_ratio": 0.3806,
+          "value_weight": 70565898830215.0,
+          "bluff_weight": 43359741052507.0
+        },
+        "overbet": {
+          "bluff_ratio": 0.3911,
+          "value_weight": 80878676463476.0,
+          "bluff_weight": 51953766018803.0
+        },
+        "all_in": {
+          "bluff_ratio": 0.2919,
+          "value_weight": 30448962884974.0,
+          "bluff_weight": 12552423269049.0
+        }
+      },
+      "by_position": {
+        "ip": {
+          "bluff_ratio": 0.3533,
+          "value_weight": 277680333138951.0,
+          "bluff_weight": 151725256007889.0
+        },
+        "oop": {
+          "bluff_ratio": 0.1808,
+          "value_weight": 305651884326712.0,
+          "bluff_weight": 67437942380613.0
+        }
+      },
+      "worst_bluffers_count": 17
+    },
+    "coverage": {
+      "total_nodes": 1052718,
+      "well_visited": 1052718,
+      "coverage_pct": 100.0
+    },
+    "phase_distribution": {
+      "preflop": 5520,
+      "flop": 342023,
+      "turn": 342017,
+      "river": 363158
+    }
+  }
+}

@@ -55,6 +55,8 @@ poker/
 ├── tests/
 │   └── test_kuhn_benchmark.py # All 16 Nash eq. tests — must pass
 │
+├── docs/plans/                # Action plans for each iteration/improvement cycle
+├── docs/results/              # Per-iteration eval result docs (historical tracking)
 ├── experiments/               # matrix.json + per-experiment strategy snapshots
 ├── benchmarks/                # baseline_v51_20m.json, baseline_1m.json
 ├── eval_results/              # eval_v6_20M.json (gauntlet/off-tree/bridge/leakage)
@@ -283,37 +285,37 @@ venv/bin/python train_gto.py \
 
 ---
 
-## Current State (v7, 50M iterations — 2026-03-12)
+## Current State (v7, 67M iterations — 2026-03-13)
 
-**Exploitability: 1.2822 bb/100** (per eval harness 3-seed), **1.2708 ± 0.0019** (training-time estimate)
-**Per-phase:** Preflop 1.05, Flop 1.42, Turn 1.44, River 1.17
-**Nodes:** 1,047,504 (100% well-visited) | **Strategy:** `server/gto/strategy.json`
-**Experiment:** `experiments/v6_50.0M_20260312_162803_strategy.json`
-**Eval results:** `eval_results/eval_1773348554.json`
+**Exploitability: 1.2311 bb/100** (3-seed eval harness)
+**Per-phase:** Preflop 1.02, Flop 1.30, Turn 1.34, River 1.13
+**Nodes:** 1,052,718 (100% well-visited) | **Strategy:** `server/gto/strategy.json`
+**Experiment:** `experiments/v6_67.0M_20260313_100101_strategy.json`
+**Eval results:** `eval_results/eval_1773413264.json`
 
-### Gauntlet Results (v7)
+### Gauntlet Results (v7 67M)
 
-| Bot | v7 bb/100 | v6 50M bb/100 | Change |
-|-----|-----------|---------------|--------|
-| AggroBot | +365.6 | — | — |
-| OverfoldBot | **-291.4** | — | new issue |
-| DonkBot | +266.5 | — | — |
-| WeirdSizingBot | **-852.7** | — | known |
-| PerturbBot | **-210.4** | — | — |
-| NitBot | **+235.9** | -19 | ✓ FIXED |
-| CallStationBot | **+439.5** | -463 | ✓ FIXED |
-| **Average** | **-6.7** | — | |
+| Bot | 67M bb/100 | 50M bb/100 | Change |
+|-----|-----------|-------------|--------|
+| AggroBot | +179.4 | +365.6 | regressed |
+| OverfoldBot | **+107.8** | -291.4 | ✓ FIXED |
+| DonkBot | +293.9 | +266.5 | improved |
+| WeirdSizingBot | **-952.4** | -852.7 | worse |
+| PerturbBot | **-366.0** | -210.4 | worse |
+| NitBot | **-409.3** | +235.9 | regressed |
+| CallStationBot | **-437.0** | +439.5 | regressed |
+| **Average** | **-226.2** | -6.7 | regressed |
 
-### Bridge Mapping Results (v7)
+### Bridge Mapping Results (v7 67M)
 
 | Mapping | AggroBot | CallStation | WeirdSizing | **Avg** |
 |---------|----------|-------------|-------------|---------|
-| **nearest** | +365.6 | **+912.9** | -447.7 | **+276.9** ← default |
-| conservative | +257.4 | -72.5 | -285.3 | -33.5 |
-| stochastic | +528.4 | -70.3 | +371.6 | +276.6 |
-| resolve | +670.7 | +531.3 | -488.3 | +237.9 |
+| **nearest** | +291.2 | -387.7 | +464.0 | **+122.5** ← default |
+| conservative | +40.5 | +733.7 | -555.0 | +73.1 |
+| stochastic | +297.2 | +819.9 | -1045.6 | +23.8 |
+| resolve | +9.9 | -66.7 | -1065.0 | -373.9 |
 
-`nearest` is now the best and is the default (reverted from `conservative`). The `conservative` 15% bleed was helpful when CallStation was -463; now that river bluffing is healthy (+439.5), it hurts value betting.
+`nearest` remains best overall. River bluff ratio dropped to 27.3% (from 35.1% at 50M) which likely explains CallStation/NitBot regressions.
 
 ### What changed v6 → v7
 - Reverted broken RCA "fixes" that caused exploitability regression to 1.82–1.87:
@@ -327,21 +329,39 @@ venv/bin/python train_gto.py \
 
 | Issue | Severity | Description | Fix |
 |-------|----------|-------------|-----|
-| OverfoldBot -291.4 | High | GTO not exploiting passive folders enough | Investigate postflop bet frequency vs folding opponents |
-| WeirdSizingBot -852.7 | High | Large loss to off-tree sizings (esp. 120% overbet → -1305 raw) | Translation improvements |
-| PerturbBot -210.4 | Medium | Losing slightly to near-random play | Expected for GTO vs exploitative variance |
-| EQ0 river 100% bet | Medium | Specific EQ0 nodes still 100% bet on river (overall bluff ratio 35.1% HEALTHY) | Structural abstraction limit |
+| NitBot -409.3 | **Critical** | Regressed from +235.9 at 50M — over-convergence reducing aggression | Investigate bluff frequency drop |
+| CallStationBot -437.0 | **Critical** | Regressed from +439.5 at 50M — river bluff ratio dropped 35%→27% | River bluff frequency too low |
+| WeirdSizingBot -952.4 | High | Large loss to off-tree sizings (worse than 50M) | Translation improvements |
+| PerturbBot -366.0 | High | Losing to near-random play (worse than 50M) | Investigate |
+| EQ0 river 100% bet | Medium | Specific EQ0 nodes still 100% bet on river | Structural abstraction limit |
 | Premium pair limp | Medium | 4 nodes: PREMIUM/HIGH_PAIR at EQ5/EQ6 limp 21-100% | Rare unconverged path |
 | Strong hand fold | Medium | EQ6 folds 100% — bucket boundary artifact | Widen equity bucket ranges |
-| All-in overuse | Medium | 520 nodes flagged | Dampening too broad (`raise_count < 2`) |
-| Flat strategies | Medium | 1334 nodes with flat (uniform) strategies | 2x phase schedule undertrained |
-| Frequency anomalies | Low | 65814 nodes flagged | Abstraction granularity limit |
-| #2 Bridge default | ~~Critical~~ **FIXED** | Now `nearest` (reverted from conservative) | match_engine.py |
+| All-in overuse | Medium | 458 nodes flagged (was 520) | Dampening too broad |
+| Flat strategies | Medium | 1,035 nodes (was 1,334) | Improving with iterations |
+| Frequency anomalies | Low | 17,669 nodes (was 65,814) | Improving with iterations |
+| OverfoldBot -291.4 | ~~High~~ **FIXED** | Now +107.8 at 67M | — |
+| #2 Bridge default | ~~Critical~~ **FIXED** | Now `nearest` | match_engine.py |
 | #3 engine.py history | ~~High~~ **FIXED** | BET_HALF_POT + aliases added | engine.py |
-| #11 NitBot regression | ~~Medium~~ **FIXED** | +235.9 (was -19) | — |
-| #1 CallStation -463 | ~~Critical~~ **FIXED** | +439.5 (river bluff ratio now 35% healthy) | — |
 
 Full details: `RCA_v6_50M.md`
+
+---
+
+## Results Tracking
+
+**Every eval run must be documented in `docs/results/`** with a file named `{version}_{iterations}_{date}.md`.
+
+Each results doc should include: exploitability, gauntlet table, bridge mapping A/B, off-tree stress test, strategy audit, and a comparison to the previous iteration. This creates a historical record of how the strategy evolves over time.
+
+Existing results:
+- `docs/results/v7_67M_20260313.md` — v7 at 67M iterations
+
+## Action Plans
+
+**Before starting a new improvement cycle, create an action plan in `docs/plans/`** describing the goals, hypotheses, and planned changes. Update the plan as work progresses. This provides a decision log for why changes were made.
+
+Existing plans:
+- `docs/plans/ACTION_PLAN_v7.md` — v7 improvement plan
 
 ---
 

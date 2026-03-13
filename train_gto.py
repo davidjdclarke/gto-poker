@@ -60,13 +60,18 @@ def format_num(n):
     return str(n)
 
 
-def train_with_progress(trainer, iterations, averaging_delay, sampling):
+def train_with_progress(trainer, iterations, averaging_delay, sampling,
+                        phase_schedule_mode=1, allin_dampen_mode=1,
+                        adaptive_averaging=0):
     """Train with a tqdm progress bar showing live stats."""
     if not HAS_TQDM:
         print(f"Training {format_num(iterations)} iterations "
               f"(install tqdm for progress bar)...")
         trainer.train(iterations, averaging_delay=averaging_delay,
-                      sampling=sampling)
+                      sampling=sampling,
+                      phase_schedule_mode=phase_schedule_mode,
+                      allin_dampen_mode=allin_dampen_mode,
+                      adaptive_averaging=adaptive_averaging)
         return
 
     engine = "Cython" if HAS_CYTHON and sampling == 'external' else "Python"
@@ -106,6 +111,9 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling):
         sampling=sampling,
         progress_callback=progress_callback,
         chunk_size=max(1000, iterations // 200),  # ~200 bar updates
+        phase_schedule_mode=phase_schedule_mode,
+        allin_dampen_mode=allin_dampen_mode,
+        adaptive_averaging=adaptive_averaging,
     )
 
     bar.close()
@@ -115,7 +123,9 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling):
 
 
 def train_parallel_with_progress(trainer, iterations, averaging_delay,
-                                  sampling, num_workers):
+                                  sampling, num_workers,
+                                  phase_schedule_mode=1, allin_dampen_mode=1,
+                                  adaptive_averaging=0):
     """Parallel training with tqdm progress bar."""
     import multiprocessing
     from server.gto.cfr import _parallel_worker, HAS_CYTHON
@@ -125,7 +135,10 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
         print(f"Parallel training with {num_workers} workers "
               f"({multiprocessing.cpu_count()} CPUs available)...")
         trainer.train(iterations, averaging_delay=averaging_delay,
-                      sampling=sampling, num_workers=num_workers)
+                      sampling=sampling, num_workers=num_workers,
+                      phase_schedule_mode=phase_schedule_mode,
+                      allin_dampen_mode=allin_dampen_mode,
+                      adaptive_averaging=adaptive_averaging)
         return
 
     warmup_frac = 0.005
@@ -166,6 +179,9 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
             start_iter=trainer.iterations + done,
             averaging_delay=averaging_delay,
             seed=seed + done,
+            phase_schedule_mode=phase_schedule_mode,
+            allin_dampen_mode=allin_dampen_mode,
+            adaptive_averaging=adaptive_averaging,
         )
         done += batch
         elapsed = time.time() - t_start
@@ -193,7 +209,9 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
 
         p = multiprocessing.Process(
             target=_parallel_worker,
-            args=(w, w_iters, start, averaging_delay, w_seed))
+            args=(w, w_iters, start, averaging_delay, w_seed,
+                  phase_schedule_mode, allin_dampen_mode,
+                  adaptive_averaging))
         processes.append((p, w_iters))
         p.start()
 
@@ -499,17 +517,39 @@ def main():
     import os
 
     # Parse args: train_gto.py [iterations] [sampling] [--fresh] [--workers N]
+    #   [--phase-schedule {2x,3x}] [--allin-dampen {old,new}]
     flags = [a for a in sys.argv[1:] if a.startswith('--')]
     fresh = '--fresh' in flags
 
-    # Parse --workers N and track which positional args to skip
+    # Parse --key value flags and track which positional args to skip
     num_workers = 1
+    phase_schedule_mode = 1  # default: 3x
+    allin_dampen_mode = 1    # default: new (rc==0, 0.5x)
+    adaptive_averaging = 0   # default: global averaging delay
+    checkpoint_interval = 0  # 0 = disabled
+    checkpoint_dir = 'checkpoints'
+    checkpoint_eval = '--checkpoint-eval' in flags
     skip_indices = set()
     for i, flag in enumerate(sys.argv[1:], 1):
         if flag == '--workers' and i < len(sys.argv) - 1:
             num_workers = int(sys.argv[i + 1])
-            skip_indices.add(i + 1)  # skip the value after --workers
-            break
+            skip_indices.add(i + 1)
+        elif flag == '--phase-schedule' and i < len(sys.argv) - 1:
+            val = sys.argv[i + 1]
+            phase_schedule_mode = 0 if val == '2x' else 1
+            skip_indices.add(i + 1)
+        elif flag == '--allin-dampen' and i < len(sys.argv) - 1:
+            val = sys.argv[i + 1]
+            allin_dampen_mode = 0 if val == 'old' else 1
+            skip_indices.add(i + 1)
+        elif flag == '--adaptive-averaging':
+            adaptive_averaging = 1
+        elif flag == '--checkpoint-interval' and i < len(sys.argv) - 1:
+            checkpoint_interval = int(sys.argv[i + 1])
+            skip_indices.add(i + 1)
+        elif flag == '--checkpoint-dir' and i < len(sys.argv) - 1:
+            checkpoint_dir = sys.argv[i + 1]
+            skip_indices.add(i + 1)
     if num_workers < 1:
         num_workers = 1
 
@@ -527,12 +567,17 @@ def main():
     if num_workers > 1:
         engine_str += f' x{num_workers}'
 
+    schedule_str = '3x' if phase_schedule_mode == 1 else '2x'
+    dampen_str = 'new (rc==0,0.5x)' if allin_dampen_mode == 1 else 'old (rc<2,0.7x)'
+
     print(f"┌─────────────────────────────────────────────────┐")
     print(f"│  GTO Solver Training                            │")
     print(f"│  Iterations: {format_num(iterations):>10}                        │")
     print(f"│  Sampling:   {sampling:>10}                        │")
     print(f"│  Buckets:    {NUM_BUCKETS:>10} (8 eq × 15 ht)       │")
     print(f"│  Engine:     {engine_str:>10}                        │")
+    print(f"│  Schedule:   {schedule_str:>10} flop/turn             │")
+    print(f"│  All-in:     {dampen_str:>18}       │")
     print(f"└─────────────────────────────────────────────────┘")
 
     trainer = CFRTrainer()
@@ -548,12 +593,71 @@ def main():
 
     averaging_delay = iterations // 4
 
+    # Checkpoint setup
+    ckpt_log = []
+    if checkpoint_interval > 0:
+        ckpt_path = Path(checkpoint_dir)
+        ckpt_path.mkdir(parents=True, exist_ok=True)
+        print(f"  Checkpoints every {format_num(checkpoint_interval)} iters → {ckpt_path}/")
+
+    def _do_train(n_iters):
+        """Run one segment of training."""
+        if num_workers > 1:
+            train_parallel_with_progress(trainer, n_iters, averaging_delay,
+                                         sampling, num_workers,
+                                         phase_schedule_mode=phase_schedule_mode,
+                                         allin_dampen_mode=allin_dampen_mode,
+                                         adaptive_averaging=adaptive_averaging)
+        else:
+            train_with_progress(trainer, n_iters, averaging_delay, sampling,
+                                phase_schedule_mode=phase_schedule_mode,
+                                allin_dampen_mode=allin_dampen_mode,
+                                adaptive_averaging=adaptive_averaging)
+
     t_start = time.time()
-    if num_workers > 1:
-        train_parallel_with_progress(trainer, iterations, averaging_delay,
-                                     sampling, num_workers)
+
+    if checkpoint_interval > 0 and iterations > checkpoint_interval:
+        # Segment training into checkpoint-sized chunks
+        remaining = iterations
+        while remaining > 0:
+            segment = min(checkpoint_interval, remaining)
+            _do_train(segment)
+            remaining -= segment
+
+            # Save checkpoint
+            total_iters = trainer.iterations
+            ckpt_file = ckpt_path / f"ckpt_{total_iters}.json"
+            trainer.save(str(ckpt_file))
+            entry = {
+                'iterations': total_iters,
+                'nodes': len(trainer.nodes),
+                'timestamp': time.strftime('%Y%m%d_%H%M%S'),
+                'file': str(ckpt_file),
+            }
+
+            # Optional: compute exploitability at checkpoint
+            if checkpoint_eval:
+                try:
+                    expl = exploitability_abstracted(trainer, samples=200)
+                    entry['exploitability'] = round(expl, 4)
+                    print(f"  Checkpoint {format_num(total_iters)}: "
+                          f"expl={expl:.4f}, nodes={len(trainer.nodes):,}")
+                except Exception as e:
+                    print(f"  Checkpoint {format_num(total_iters)}: "
+                          f"eval failed ({e}), nodes={len(trainer.nodes):,}")
+            else:
+                print(f"  Checkpoint {format_num(total_iters)}: "
+                      f"nodes={len(trainer.nodes):,}")
+
+            ckpt_log.append(entry)
+
+            # Save checkpoint log
+            log_file = ckpt_path / 'checkpoint_log.json'
+            with open(log_file, 'w') as f:
+                json.dump(ckpt_log, f, indent=2)
     else:
-        train_with_progress(trainer, iterations, averaging_delay, sampling)
+        _do_train(iterations)
+
     train_time = time.time() - t_start
 
     # Apply post-training strategy overrides before saving

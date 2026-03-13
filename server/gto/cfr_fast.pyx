@@ -307,6 +307,7 @@ cdef int get_actions(bint has_bet, bint can_raise, bint is_preflop,
 
 cdef struct NodeData:
     int num_actions
+    int first_visit_iter   # iteration when this node was first visited (-1 = unvisited)
     double regret_sum[13]
     double strategy_sum[13]
 
@@ -410,6 +411,13 @@ cdef long long* _progress_counters = NULL
 cdef size_t _progress_counters_size = 0
 cdef int _worker_id = -1
 
+# --- Ablation config flags (set by train_fast) ---
+cdef int _allin_dampen_mode = 1    # 0=old (rc<2, 0.7x), 1=new (rc==0, 0.5x)
+cdef int _phase_schedule_mode = 1  # 0=2x (6-step), 1=3x (8-step)
+cdef int _adaptive_averaging = 0   # 0=global (default), 1=per-node adaptive
+cdef int _current_iter = 0         # current iteration (set by train_fast per iteration)
+cdef int _global_averaging_delay = 0  # global averaging delay (set by train_fast)
+
 
 def init_progress_counters(int num_workers):
     """Allocate shared-memory progress counters (call before fork)."""
@@ -477,6 +485,7 @@ cdef int get_or_create_node(long long key, int num_actions) noexcept:
         _grow_pool()
 
     node_pool[idx].num_actions = num_actions
+    node_pool[idx].first_visit_iter = -1
     for i in range(13):
         node_pool[idx].regret_sum[i] = 0.0
         node_pool[idx].strategy_sum[i] = 0.0
@@ -606,6 +615,8 @@ cdef double cfr_single_street(int phase, int bucket_p0, int bucket_p1,
     cdef double action_utilities[13]
     cdef double node_utility
     cdef double regrets[13]
+    cdef double node_weight
+    cdef int node_delay
 
     # Fold terminal
     terminal_val = check_terminal_value(history, hlen, bucket_p0, bucket_p1, phase == PHASE_PREFLOP)
@@ -635,6 +646,18 @@ cdef double cfr_single_street(int phase, int bucket_p0, int bucket_p1,
     num_actions = get_actions(hb, cr_bool, is_pf, rc, hlen, phase, bucket, actions)
     key = make_key(phase, position, bucket, history, hlen)
     node_idx = get_or_create_node(key, num_actions)
+
+    # Track first visit and compute per-node weight if adaptive averaging
+    node_weight = weight
+    if node_idx >= 0:
+        if node_pool[node_idx].first_visit_iter < 0:
+            node_pool[node_idx].first_visit_iter = _current_iter
+        if _adaptive_averaging == 1:
+            # Per-node delay: max(global_delay, first_visit + warmup)
+            node_delay = node_pool[node_idx].first_visit_iter + 1000
+            if node_delay < _global_averaging_delay:
+                node_delay = _global_averaging_delay
+            node_weight = <double>(_current_iter - node_delay) if _current_iter > node_delay else 0.0
 
     # Get strategy (uniform if node unknown)
     if node_idx >= 0:
@@ -670,14 +693,20 @@ cdef double cfr_single_street(int phase, int bucket_p0, int bucket_p1,
     if node_idx >= 0:
         for i in range(num_actions):
             regrets[i] = action_utilities[i] - node_utility
-            # Dampen all-in regrets for cold jams only (rc==0), stronger factor.
-            if actions[i] == ACT_ALL_IN and rc == 0:
-                regrets[i] *= 0.5
+            # All-in dampening (configurable for ablation)
+            if _allin_dampen_mode == 1:
+                # New: cold jams only (rc==0), stronger factor
+                if actions[i] == ACT_ALL_IN and rc == 0:
+                    regrets[i] *= 0.5
+            else:
+                # Old: broader dampening (rc<2), weaker factor
+                if actions[i] == ACT_ALL_IN and rc < 2:
+                    regrets[i] *= 0.7
 
         # Re-derive pointer: recursion may have triggered _grow_pool()
         node = &node_pool[node_idx]
         node_update_regrets(node, regrets)
-        node_accumulate_strategy(node, strategy, weight)
+        node_accumulate_strategy(node, strategy, node_weight)
 
     return node_utility
 
@@ -793,15 +822,28 @@ cdef void sample_street_buckets(int* out_buckets) noexcept nogil:
 # --- Python-callable training function ---
 
 def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
-               unsigned int seed=42):
+               unsigned int seed=42, int phase_schedule_mode=1,
+               int allin_dampen_mode=1, int adaptive_averaging=0):
     """
     Run CFR+ training entirely in Cython.
 
-    Uses weighted phase schedule: flop/turn get 2x iterations to reduce
+    Uses weighted phase schedule: flop/turn get 2x or 3x iterations to reduce
     their higher exploitability vs preflop/river.
+
+    Args:
+        phase_schedule_mode: 0=2x (6-step), 1=3x (8-step, default)
+        allin_dampen_mode: 0=old (rc<2, 0.7x), 1=new (rc==0, 0.5x, default)
+        adaptive_averaging: 0=global delay (default), 1=per-node adaptive delay
 
     Returns total iterations completed.
     """
+    global _allin_dampen_mode, _phase_schedule_mode, _adaptive_averaging
+    global _current_iter, _global_averaging_delay
+    _allin_dampen_mode = allin_dampen_mode
+    _phase_schedule_mode = phase_schedule_mode
+    _adaptive_averaging = adaptive_averaging
+    _global_averaging_delay = averaging_delay
+
     rng_seed(<unsigned long long>seed)
 
     cdef int buckets_p0[4]
@@ -812,20 +854,33 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
     cdef int b0, b1
     cdef int i, s
 
-    # Weighted phase schedule: flop(1) and turn(2) get 3x training
+    # Phase schedule: configurable for ablation
     cdef int phase_schedule[8]
-    cdef int schedule_len = 8
-    phase_schedule[0] = PHASE_PREFLOP
-    phase_schedule[1] = PHASE_FLOP
-    phase_schedule[2] = PHASE_FLOP
-    phase_schedule[3] = PHASE_FLOP
-    phase_schedule[4] = PHASE_TURN
-    phase_schedule[5] = PHASE_TURN
-    phase_schedule[6] = PHASE_TURN
-    phase_schedule[7] = PHASE_RIVER
+    cdef int schedule_len
+    if phase_schedule_mode == 0:
+        # 2x schedule (original)
+        schedule_len = 6
+        phase_schedule[0] = PHASE_PREFLOP
+        phase_schedule[1] = PHASE_FLOP
+        phase_schedule[2] = PHASE_FLOP
+        phase_schedule[3] = PHASE_TURN
+        phase_schedule[4] = PHASE_TURN
+        phase_schedule[5] = PHASE_RIVER
+    else:
+        # 3x schedule (current default)
+        schedule_len = 8
+        phase_schedule[0] = PHASE_PREFLOP
+        phase_schedule[1] = PHASE_FLOP
+        phase_schedule[2] = PHASE_FLOP
+        phase_schedule[3] = PHASE_FLOP
+        phase_schedule[4] = PHASE_TURN
+        phase_schedule[5] = PHASE_TURN
+        phase_schedule[6] = PHASE_TURN
+        phase_schedule[7] = PHASE_RIVER
 
     for i in range(num_iterations):
         t = start_iter + i + 1
+        _current_iter = t
         weight = <double>(t - averaging_delay) if t > averaging_delay else 0.0
 
         for s in range(schedule_len):
@@ -866,6 +921,7 @@ def get_all_nodes():
     for py_key, idx in node_index.items():
         result[py_key] = {
             'num_actions': node_pool[idx].num_actions,
+            'first_visit_iter': node_pool[idx].first_visit_iter,
             'regret_sum': [node_pool[idx].regret_sum[j]
                            for j in range(node_pool[idx].num_actions)],
             'strategy_sum': [node_pool[idx].strategy_sum[j]
@@ -887,6 +943,7 @@ def import_nodes(nodes_dict):
             _grow_pool()
 
         node_pool[idx].num_actions = n
+        node_pool[idx].first_visit_iter = data.get('first_visit_iter', -1)
         regrets = data['regret_sum']
         strats = data['strategy_sum']
         for i in range(n):

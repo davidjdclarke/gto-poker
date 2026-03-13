@@ -402,6 +402,9 @@ def main():
     parser.add_argument("--offtree", action="store_true", help="Run off-tree tests only")
     parser.add_argument("--bridge", action="store_true", help="Run bridge A/B only")
     parser.add_argument("--leakage", action="store_true", help="Run rare-node leakage only")
+    parser.add_argument("--behavioral", action="store_true", help="Run behavioral regression suite")
+    parser.add_argument("--behavioral-baseline", type=str, default=None,
+                        help="Path to baseline behavioral_regression.json for delta comparison")
     parser.add_argument("--hands", type=int, default=500, help="Hands per matchup (default 500)")
     parser.add_argument("--quick", action="store_true", help="Quick check (100 hands)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -414,7 +417,7 @@ def main():
     if args.quick:
         args.hands = 100
 
-    run_all = not (args.gauntlet or args.offtree or args.bridge or args.leakage)
+    run_all = not (args.gauntlet or args.offtree or args.bridge or args.leakage or args.behavioral)
 
     # Load strategy
     print("Loading strategy...")
@@ -446,6 +449,8 @@ def main():
         stages.append("bridge")
     if run_all or args.leakage:
         stages.append("leakage")
+    if run_all or args.behavioral:
+        stages.append("behavioral")
 
     stage_bar = tqdm(stages, desc="Overall", unit="stage", leave=True,
                      bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} stages [{elapsed}<{remaining}]")
@@ -464,6 +469,13 @@ def main():
                 trainer, args.hands, args.seed, args.bb)
         elif stage == "leakage":
             all_results["leakage"] = run_leakage(trainer)
+        elif stage == "behavioral":
+            from eval_harness.behavioral_regression import (
+                run_behavioral_regression, print_behavioral_report)
+            beh_results = run_behavioral_regression(
+                trainer, baseline_path=args.behavioral_baseline)
+            print_behavioral_report(beh_results)
+            all_results["behavioral"] = beh_results
 
     stage_bar.close()
 
@@ -501,6 +513,11 @@ def main():
         cov = all_results["leakage"].get("coverage", {})
         print(f"  [INFO] Exploitability: {exp.get('mean', '?')}")
         print(f"  [INFO] Node coverage: {cov.get('coverage_pct', '?')}%")
+
+    if "behavioral" in all_results:
+        beh = all_results["behavioral"]
+        families_with_nodes = sum(1 for r in beh.values() if r.get('num_nodes', 0) > 0)
+        print(f"  [INFO] Behavioral: {families_with_nodes}/6 families audited")
 
     # Save results
     if args.save:
