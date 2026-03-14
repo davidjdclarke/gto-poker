@@ -86,13 +86,22 @@ class GTOAgent(Agent):
         self.lookup_hits = 0
         self.lookup_misses = 0
         self.abstraction_mismatches = 0
+        self.bridge_log = []  # list of (concrete_ratio, mapped_action, phase, bucket)
 
     def decide(self, ctx: HandContext) -> AgentDecision:
         bucket = fast_bucket(ctx.hole_cards, ctx.community_cards,
                              simulations=self.simulations)
+        self._last_bucket = bucket  # exposed for detailed tracking
 
         history = _concrete_to_abstract_history(ctx.betting_history, ctx.phase)
         position = 'oop' if not ctx.is_ip else 'ip'
+
+        # Log bridge mapping when facing an opponent bet (for pain map)
+        to_call = ctx.current_bet - ctx.my_bet
+        if to_call > 0 and ctx.pot > 0 and history:
+            concrete_ratio = to_call / ctx.pot
+            mapped_action = int(history[-1])
+            self.bridge_log.append((concrete_ratio, mapped_action, ctx.phase, bucket))
 
         # Fix: for abstract lookup, position is encoded by history length
         # P0 (oop) acts at even history, P1 (ip) at odd history
@@ -125,9 +134,11 @@ class GTOAgent(Agent):
         if self.mapping == "conservative":
             if int(Action.CHECK_CALL) in strategy:
                 boost = 0.0
-                for a in [int(Action.BET_THIRD_POT), int(Action.BET_HALF_POT),
-                           int(Action.BET_TWO_THIRDS_POT), int(Action.BET_POT),
-                           int(Action.BET_OVERBET),
+                for a in [int(Action.BET_QUARTER_POT), int(Action.BET_THIRD_POT),
+                           int(Action.BET_HALF_POT),
+                           int(Action.BET_TWO_THIRDS_POT), int(Action.BET_THREE_QUARTER_POT),
+                           int(Action.BET_POT),
+                           int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
                            int(Action.DONK_SMALL), int(Action.DONK_MEDIUM)]:
                     if a in strategy:
                         steal = strategy[a] * 0.15
@@ -191,9 +202,12 @@ def _has_bet_to_call(history: tuple, phase: str) -> bool:
     if not history:
         return phase == 'preflop'  # BB is a forced bet
     bet_actions = {
-        int(Action.BET_THIRD_POT), int(Action.BET_HALF_POT),
-        int(Action.BET_TWO_THIRDS_POT), int(Action.BET_POT),
-        int(Action.BET_OVERBET), int(Action.ALL_IN),
+        int(Action.BET_QUARTER_POT), int(Action.BET_THIRD_POT),
+        int(Action.BET_HALF_POT),
+        int(Action.BET_TWO_THIRDS_POT), int(Action.BET_THREE_QUARTER_POT),
+        int(Action.BET_POT),
+        int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
+        int(Action.ALL_IN),
         int(Action.OPEN_RAISE), int(Action.THREE_BET),
         int(Action.FOUR_BET),
         int(Action.DONK_SMALL), int(Action.DONK_MEDIUM),
@@ -226,11 +240,14 @@ def _abstract_to_concrete(action: Action, ctx: HandContext) -> AgentDecision:
         Action.OPEN_RAISE: max(ctx.min_raise, int(ctx.big_blind * 2.5)),
         Action.THREE_BET: max(ctx.min_raise, ctx.current_bet * 3),
         Action.FOUR_BET: max(ctx.min_raise, int(ctx.current_bet * 2.2)),
+        Action.BET_QUARTER_POT: max(ctx.min_raise, ctx.pot // 4),
         Action.BET_THIRD_POT: max(ctx.min_raise, ctx.pot // 3),
         Action.BET_HALF_POT: max(ctx.min_raise, ctx.pot // 2),
         Action.BET_TWO_THIRDS_POT: max(ctx.min_raise, int(ctx.pot * 2 / 3)),
+        Action.BET_THREE_QUARTER_POT: max(ctx.min_raise, int(ctx.pot * 3 / 4)),
         Action.BET_POT: max(ctx.min_raise, ctx.pot),
         Action.BET_OVERBET: max(ctx.min_raise, int(ctx.pot * 1.25)),
+        Action.BET_DOUBLE_POT: max(ctx.min_raise, ctx.pot * 2),
         Action.DONK_SMALL: max(ctx.min_raise, ctx.pot // 4),
         Action.DONK_MEDIUM: max(ctx.min_raise, ctx.pot // 2),
     }
@@ -263,25 +280,43 @@ def classify_raise(raise_amount: int, pot: int, current_bet: int,
             return "all_in"
 
     if pot <= 0:
-        return "bet_third"
+        return "bet_quarter"
     ratio = raise_amount / pot
     if ratio >= 2.5:
         return "all_in"
+    elif ratio >= 1.5:
+        return "bet_double_pot"
     elif ratio >= 1.1:
         return "bet_overbet"
-    elif ratio >= 0.8:
+    elif ratio >= 0.875:
         return "bet_pot"
+    elif ratio >= 0.71:
+        return "bet_three_quarter"
     elif ratio >= 0.56:
         return "bet_two_thirds"
     elif ratio >= 0.4:
         return "bet_half"
-    else:
+    elif ratio >= 0.28:
         return "bet_third"
+    else:
+        return "bet_quarter"
 
 
 # ---------------------------------------------------------------------------
 # Match result tracking
 # ---------------------------------------------------------------------------
+@dataclass
+class DecisionRecord:
+    """Record of a single decision within a hand (for detailed tracking)."""
+    player: int              # 0 or 1
+    phase: str
+    action: str              # concrete action string
+    bucket: int              # abstract bucket (-1 if not GTO agent)
+    eq_bucket: int           # equity bucket (-1 if not GTO agent)
+    pot_before: int          # pot before this action
+    amount: int              # chips committed by this action (0 for check/fold)
+
+
 @dataclass
 class HandRecord:
     """Record of a single hand played."""
@@ -295,6 +330,10 @@ class HandRecord:
     phases_reached: list[str]
     went_to_showdown: bool
     actions: list[str]
+    # Detailed tracking fields (populated when detailed_tracking=True)
+    street_ev: dict = field(default_factory=dict)           # phase -> p0 net chips from that street
+    p0_bucket_per_street: dict = field(default_factory=dict) # phase -> p0 bucket
+    decisions: list = field(default_factory=list)            # list[DecisionRecord]
 
 
 @dataclass
@@ -336,12 +375,13 @@ class HeadsUpMatch:
 
     def __init__(self, agent0: Agent, agent1: Agent,
                  starting_chips: int = 10000, big_blind: int = 20,
-                 seed: int = None):
+                 seed: int = None, detailed_tracking: bool = False):
         self.agents = [agent0, agent1]
         self.starting_chips = starting_chips
         self.big_blind = big_blind
         self.small_blind = big_blind // 2
         self.seed = seed
+        self.detailed_tracking = detailed_tracking
         if seed is not None:
             random.seed(seed)
 
@@ -381,6 +421,9 @@ class HeadsUpMatch:
         community = []
         actions_log = []
         phases_reached = ["preflop"]
+        decisions = []  # list[DecisionRecord] for detailed tracking
+        street_ev = {}  # phase -> p0 net chips
+        p0_bucket_per_street = {}
 
         # Deal hole cards
         hole_cards = [deck.deal(2), deck.deal(2)]
@@ -395,6 +438,14 @@ class HeadsUpMatch:
         current_bet = bb_amount
         min_raise = self.big_blind
 
+        # Track P0 chips at start of each street for EV decomposition
+        p0_chips_at_street_start = chips[0]
+
+        # Record P0 bucket for preflop if tracking
+        if self.detailed_tracking:
+            p0_bucket_per_street["preflop"] = fast_bucket(
+                hole_cards[0], community, simulations=80)
+
         # Preflop betting
         folded = [False, False]
         street_history = []
@@ -406,13 +457,17 @@ class HeadsUpMatch:
         pot, folded, street_history, raise_count = self._betting_round(
             acting_order, chips, bets, pot, current_bet, min_raise,
             community, hole_cards, "preflop", hand_num, folded,
-            sb_idx, actions_log,
+            sb_idx, actions_log, decisions,
         )
+
+        if self.detailed_tracking:
+            street_ev["preflop"] = float(chips[0] - p0_chips_at_street_start)
 
         if folded[0] or folded[1]:
             return self._finish_hand(
                 hand_num, hole_cards, community, pot, bets, chips,
                 folded, phases_reached, False, actions_log, sb_idx,
+                street_ev, p0_bucket_per_street, decisions,
             )
 
         # Collect bets
@@ -426,6 +481,11 @@ class HeadsUpMatch:
             phases_reached.append(street_name)
             deck.burn()
             community.extend(deck.deal(num_cards))
+            p0_chips_at_street_start = chips[0]
+
+            if self.detailed_tracking:
+                p0_bucket_per_street[street_name] = fast_bucket(
+                    hole_cards[0], community, simulations=80)
 
             # Postflop: BB (OOP) acts first
             acting_order = [bb_idx, sb_idx]
@@ -433,13 +493,17 @@ class HeadsUpMatch:
             pot, folded, street_history, raise_count = self._betting_round(
                 acting_order, chips, bets, pot, current_bet, min_raise,
                 community, hole_cards, street_name, hand_num, folded,
-                sb_idx, actions_log,
+                sb_idx, actions_log, decisions,
             )
+
+            if self.detailed_tracking:
+                street_ev[street_name] = float(chips[0] - p0_chips_at_street_start)
 
             if folded[0] or folded[1]:
                 return self._finish_hand(
                     hand_num, hole_cards, community, pot, bets, chips,
                     folded, phases_reached, False, actions_log, sb_idx,
+                    street_ev, p0_bucket_per_street, decisions,
                 )
 
             pot += bets[0] + bets[1]
@@ -451,11 +515,12 @@ class HeadsUpMatch:
         return self._finish_hand(
             hand_num, hole_cards, community, pot, bets, chips,
             folded, phases_reached, True, actions_log, sb_idx,
+            street_ev, p0_bucket_per_street, decisions,
         )
 
     def _betting_round(self, acting_order, chips, bets, pot, current_bet,
                        min_raise, community, hole_cards, phase, hand_num,
-                       folded, sb_idx, actions_log):
+                       folded, sb_idx, actions_log, decisions=None):
         """Run one street of betting. Returns (pot, folded, history, raise_count)."""
         street_history = []
         raise_count_in = 0 if phase != "preflop" else 0
@@ -493,6 +558,7 @@ class HeadsUpMatch:
                     street_pot_start=pot,
                 )
 
+                chips_before = chips[player_idx]
                 decision = self.agents[player_idx].decide(ctx)
                 to_call = current_bet - bets[player_idx]
 
@@ -501,16 +567,19 @@ class HeadsUpMatch:
                         decision = AgentDecision("check")
                         street_history.append("check")
                         actions_log.append(f"p{player_idx}:check")
+                        concrete_action = "check"
                     else:
                         folded[player_idx] = True
                         street_history.append("fold")
                         actions_log.append(f"p{player_idx}:fold")
+                        concrete_action = "fold"
                     needs_to_act.discard(player_idx)
 
                 elif decision.action == "check":
                     street_history.append("check")
                     actions_log.append(f"p{player_idx}:check")
                     needs_to_act.discard(player_idx)
+                    concrete_action = "check"
 
                 elif decision.action == "call":
                     actual = min(to_call, chips[player_idx])
@@ -519,6 +588,7 @@ class HeadsUpMatch:
                     street_history.append("call")
                     actions_log.append(f"p{player_idx}:call")
                     needs_to_act.discard(player_idx)
+                    concrete_action = "call"
 
                 elif decision.action == "raise":
                     raise_to = decision.amount
@@ -531,6 +601,7 @@ class HeadsUpMatch:
                         street_history.append("call")
                         actions_log.append(f"p{player_idx}:call")
                         needs_to_act.discard(player_idx)
+                        concrete_action = "call"
                     else:
                         actual_raise = raise_to - bets[player_idx]
                         chips[player_idx] -= actual_raise
@@ -550,8 +621,28 @@ class HeadsUpMatch:
                         opp = 1 - player_idx
                         if not folded[opp] and chips[opp] > 0:
                             needs_to_act.add(opp)
+                        concrete_action = label
 
                 action_count += 1
+
+                # Record detailed decision if tracking enabled
+                if self.detailed_tracking and decisions is not None:
+                    agent = self.agents[player_idx]
+                    bucket = -1
+                    eq_bucket = -1
+                    if hasattr(agent, '_last_bucket'):
+                        bucket = agent._last_bucket
+                        eq_bucket = bucket // 15 if bucket >= 0 else -1
+                    chips_spent = chips_before - chips[player_idx]
+                    decisions.append(DecisionRecord(
+                        player=player_idx,
+                        phase=phase,
+                        action=concrete_action,
+                        bucket=bucket,
+                        eq_bucket=eq_bucket,
+                        pot_before=pot + bets[0] + bets[1],
+                        amount=chips_spent,
+                    ))
 
                 # Record this player's action into the *other* agent's opponent profile
                 other_agent = self.agents[1 - player_idx]
@@ -567,7 +658,8 @@ class HeadsUpMatch:
         return pot, folded, street_history, raise_count_in
 
     def _finish_hand(self, hand_num, hole_cards, community, pot, bets, chips,
-                     folded, phases_reached, showdown, actions_log, sb_idx):
+                     folded, phases_reached, showdown, actions_log, sb_idx,
+                     street_ev=None, p0_bucket_per_street=None, decisions=None):
         """Resolve hand and compute net chips."""
         # Collect remaining bets
         total_pot = pot + bets[0] + bets[1]
@@ -627,4 +719,7 @@ class HeadsUpMatch:
             phases_reached=phases_reached,
             went_to_showdown=showdown,
             actions=actions_log,
+            street_ev=street_ev or {},
+            p0_bucket_per_street=p0_bucket_per_street or {},
+            decisions=decisions or [],
         )

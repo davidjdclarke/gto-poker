@@ -465,11 +465,14 @@ class Game:
         mapping = {
             "check": int(Action.CHECK_CALL),
             "call": int(Action.CHECK_CALL),
+            "bet_quarter": int(Action.BET_QUARTER_POT),
             "bet_third": int(Action.BET_THIRD_POT),
             "bet_half": int(Action.BET_HALF_POT),
             "bet_two_thirds": int(Action.BET_TWO_THIRDS_POT),
+            "bet_three_quarter": int(Action.BET_THREE_QUARTER_POT),
             "bet_pot": int(Action.BET_POT),
             "bet_overbet": int(Action.BET_OVERBET),
+            "bet_double_pot": int(Action.BET_DOUBLE_POT),
             "donk_small": int(Action.DONK_SMALL),
             "donk_medium": int(Action.DONK_MEDIUM),
             "all_in": int(Action.ALL_IN),
@@ -479,8 +482,9 @@ class Game:
         }
 
         raise_actions = {"open_raise", "three_bet", "four_bet",
-                         "bet_third", "bet_half", "bet_two_thirds",
-                         "bet_pot", "bet_overbet",
+                         "bet_quarter", "bet_third", "bet_half",
+                         "bet_two_thirds", "bet_three_quarter",
+                         "bet_pot", "bet_overbet", "bet_double_pot",
                          "donk_small", "donk_medium", "all_in"}
 
         if not self.round_history:

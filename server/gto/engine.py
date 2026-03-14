@@ -281,6 +281,16 @@ def _to_concrete_action(abstract_action: Action, player: Player,
             return _fallback_action(to_call, strategy_info)
         return GTODecision("raise", total, strategy_info)
 
+    elif abstract_action == Action.BET_QUARTER_POT:
+        if player.chips <= to_call:
+            return GTODecision("call", 0, strategy_info)
+        raise_amount = max(min_raise, pot // 4)
+        total = current_bet + raise_amount
+        total = min(total, player.current_bet + player.chips)
+        if total <= current_bet:
+            return _fallback_action(to_call, strategy_info)
+        return GTODecision("raise", total, strategy_info)
+
     elif abstract_action == Action.BET_THIRD_POT:
         if player.chips <= to_call:
             return GTODecision("call", 0, strategy_info)
@@ -311,6 +321,16 @@ def _to_concrete_action(abstract_action: Action, player: Player,
             return _fallback_action(to_call, strategy_info)
         return GTODecision("raise", total, strategy_info)
 
+    elif abstract_action == Action.BET_THREE_QUARTER_POT:
+        if player.chips <= to_call:
+            return GTODecision("call", 0, strategy_info)
+        raise_amount = max(min_raise, int(pot * 3 / 4))
+        total = current_bet + raise_amount
+        total = min(total, player.current_bet + player.chips)
+        if total <= current_bet:
+            return _fallback_action(to_call, strategy_info)
+        return GTODecision("raise", total, strategy_info)
+
     elif abstract_action == Action.BET_POT:
         if player.chips <= to_call:
             return GTODecision("call", 0, strategy_info)
@@ -325,6 +345,16 @@ def _to_concrete_action(abstract_action: Action, player: Player,
         if player.chips <= to_call:
             return GTODecision("call", 0, strategy_info)
         raise_amount = max(min_raise, int(pot * 1.25))
+        total = current_bet + raise_amount
+        total = min(total, player.current_bet + player.chips)
+        if total <= current_bet:
+            return _fallback_action(to_call, strategy_info)
+        return GTODecision("raise", total, strategy_info)
+
+    elif abstract_action == Action.BET_DOUBLE_POT:
+        if player.chips <= to_call:
+            return GTODecision("call", 0, strategy_info)
+        raise_amount = max(min_raise, pot * 2)
         total = current_bet + raise_amount
         total = min(total, player.current_bet + player.chips)
         if total <= current_bet:

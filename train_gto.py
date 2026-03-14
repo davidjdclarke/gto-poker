@@ -62,7 +62,8 @@ def format_num(n):
 
 def train_with_progress(trainer, iterations, averaging_delay, sampling,
                         phase_schedule_mode=1, allin_dampen_mode=1,
-                        adaptive_averaging=0):
+                        adaptive_averaging=0, regret_discount=1.0,
+                        weight_schedule_mode=0, weight_schedule_param=1.0):
     """Train with a tqdm progress bar showing live stats."""
     if not HAS_TQDM:
         print(f"Training {format_num(iterations)} iterations "
@@ -71,7 +72,10 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling,
                       sampling=sampling,
                       phase_schedule_mode=phase_schedule_mode,
                       allin_dampen_mode=allin_dampen_mode,
-                      adaptive_averaging=adaptive_averaging)
+                      adaptive_averaging=adaptive_averaging,
+                      regret_discount=regret_discount,
+                      weight_schedule_mode=weight_schedule_mode,
+                      weight_schedule_param=weight_schedule_param)
         return
 
     engine = "Cython" if HAS_CYTHON and sampling == 'external' else "Python"
@@ -114,6 +118,9 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling,
         phase_schedule_mode=phase_schedule_mode,
         allin_dampen_mode=allin_dampen_mode,
         adaptive_averaging=adaptive_averaging,
+        regret_discount=regret_discount,
+        weight_schedule_mode=weight_schedule_mode,
+        weight_schedule_param=weight_schedule_param,
     )
 
     bar.close()
@@ -125,7 +132,8 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling,
 def train_parallel_with_progress(trainer, iterations, averaging_delay,
                                   sampling, num_workers,
                                   phase_schedule_mode=1, allin_dampen_mode=1,
-                                  adaptive_averaging=0):
+                                  adaptive_averaging=0, regret_discount=1.0,
+                                  weight_schedule_mode=0, weight_schedule_param=1.0):
     """Parallel training with tqdm progress bar."""
     import multiprocessing
     from server.gto.cfr import _parallel_worker, HAS_CYTHON
@@ -138,7 +146,10 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
                       sampling=sampling, num_workers=num_workers,
                       phase_schedule_mode=phase_schedule_mode,
                       allin_dampen_mode=allin_dampen_mode,
-                      adaptive_averaging=adaptive_averaging)
+                      adaptive_averaging=adaptive_averaging,
+                      regret_discount=regret_discount,
+                      weight_schedule_mode=weight_schedule_mode,
+                      weight_schedule_param=weight_schedule_param)
         return
 
     warmup_frac = 0.005
@@ -182,6 +193,9 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
             phase_schedule_mode=phase_schedule_mode,
             allin_dampen_mode=allin_dampen_mode,
             adaptive_averaging=adaptive_averaging,
+            regret_discount=regret_discount,
+            weight_schedule_mode=weight_schedule_mode,
+            weight_schedule_param=weight_schedule_param,
         )
         done += batch
         elapsed = time.time() - t_start
@@ -211,7 +225,8 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
             target=_parallel_worker,
             args=(w, w_iters, start, averaging_delay, w_seed,
                   phase_schedule_mode, allin_dampen_mode,
-                  adaptive_averaging))
+                  adaptive_averaging, regret_discount,
+                  weight_schedule_mode, weight_schedule_param))
         processes.append((p, w_iters))
         p.start()
 
@@ -513,6 +528,27 @@ def apply_strategy_overrides(trainer: CFRTrainer) -> dict:
     return result
 
 
+def _run_checkpoint_gauntlet(trainer, hands=500, big_blind=20):
+    """Run quick gauntlet at a checkpoint. Returns dict of results."""
+    from eval_harness.match_engine import HeadsUpMatch, GTOAgent
+    from eval_harness.adversaries import get_all_adversaries
+
+    gto = GTOAgent(trainer, simulations=40)
+    bots = get_all_adversaries(trainer=trainer)
+    results = {}
+    total = 0.0
+
+    for bot in bots:
+        match = HeadsUpMatch(gto, bot, big_blind=big_blind, seed=42)
+        result = match.play(hands)
+        bb100 = result.p0_bb_per_100
+        results[bot.name] = round(bb100, 1)
+        total += bb100
+
+    results['avg_bb_per_100'] = round(total / len(bots), 1)
+    return results
+
+
 def main():
     import os
 
@@ -529,6 +565,10 @@ def main():
     checkpoint_interval = 0  # 0 = disabled
     checkpoint_dir = 'checkpoints'
     checkpoint_eval = '--checkpoint-eval' in flags
+    checkpoint_gauntlet = '--checkpoint-gauntlet' in flags
+    regret_discount = 1.0    # 1.0=CFR+, <1.0=DCFR
+    weight_schedule_mode = 0  # 0=linear, 1=exponential, 2=polynomial
+    weight_schedule_param = 1.0
     skip_indices = set()
     for i, flag in enumerate(sys.argv[1:], 1):
         if flag == '--workers' and i < len(sys.argv) - 1:
@@ -550,6 +590,16 @@ def main():
         elif flag == '--checkpoint-dir' and i < len(sys.argv) - 1:
             checkpoint_dir = sys.argv[i + 1]
             skip_indices.add(i + 1)
+        elif flag == '--regret-discount' and i < len(sys.argv) - 1:
+            regret_discount = float(sys.argv[i + 1])
+            skip_indices.add(i + 1)
+        elif flag == '--weight-schedule' and i < len(sys.argv) - 1:
+            val = sys.argv[i + 1]
+            weight_schedule_mode = {'linear': 0, 'exponential': 1, 'polynomial': 2}.get(val, 0)
+            skip_indices.add(i + 1)
+        elif flag == '--weight-param' and i < len(sys.argv) - 1:
+            weight_schedule_param = float(sys.argv[i + 1])
+            skip_indices.add(i + 1)
     if num_workers < 1:
         num_workers = 1
 
@@ -570,6 +620,12 @@ def main():
     schedule_str = '3x' if phase_schedule_mode == 1 else '2x'
     dampen_str = 'new (rc==0,0.5x)' if allin_dampen_mode == 1 else 'old (rc<2,0.7x)'
 
+    dcfr_str = f"gamma={regret_discount}" if regret_discount < 1.0 else "off (CFR+)"
+    wsched_names = {0: 'linear', 1: 'exponential', 2: 'polynomial'}
+    wsched_str = wsched_names.get(weight_schedule_mode, 'linear')
+    if weight_schedule_mode > 0:
+        wsched_str += f'({weight_schedule_param})'
+
     print(f"┌─────────────────────────────────────────────────┐")
     print(f"│  GTO Solver Training                            │")
     print(f"│  Iterations: {format_num(iterations):>10}                        │")
@@ -578,6 +634,8 @@ def main():
     print(f"│  Engine:     {engine_str:>10}                        │")
     print(f"│  Schedule:   {schedule_str:>10} flop/turn             │")
     print(f"│  All-in:     {dampen_str:>18}       │")
+    print(f"│  DCFR:       {dcfr_str:>18}       │")
+    print(f"│  Wt sched:   {wsched_str:>18}       │")
     print(f"└─────────────────────────────────────────────────┘")
 
     trainer = CFRTrainer()
@@ -607,12 +665,18 @@ def main():
                                          sampling, num_workers,
                                          phase_schedule_mode=phase_schedule_mode,
                                          allin_dampen_mode=allin_dampen_mode,
-                                         adaptive_averaging=adaptive_averaging)
+                                         adaptive_averaging=adaptive_averaging,
+                                         regret_discount=regret_discount,
+                                         weight_schedule_mode=weight_schedule_mode,
+                                         weight_schedule_param=weight_schedule_param)
         else:
             train_with_progress(trainer, n_iters, averaging_delay, sampling,
                                 phase_schedule_mode=phase_schedule_mode,
                                 allin_dampen_mode=allin_dampen_mode,
-                                adaptive_averaging=adaptive_averaging)
+                                adaptive_averaging=adaptive_averaging,
+                                regret_discount=regret_discount,
+                                weight_schedule_mode=weight_schedule_mode,
+                                weight_schedule_param=weight_schedule_param)
 
     t_start = time.time()
 
@@ -648,6 +712,16 @@ def main():
             else:
                 print(f"  Checkpoint {format_num(total_iters)}: "
                       f"nodes={len(trainer.nodes):,}")
+
+            # Optional: run quick gauntlet at checkpoint
+            if checkpoint_gauntlet:
+                try:
+                    gauntlet = _run_checkpoint_gauntlet(trainer, hands=500)
+                    entry['gauntlet'] = gauntlet
+                    avg = gauntlet.get('avg_bb_per_100', 0)
+                    print(f"    Gauntlet avg: {avg:+.1f} bb/100")
+                except Exception as e:
+                    print(f"    Gauntlet failed: {e}")
 
             ckpt_log.append(entry)
 

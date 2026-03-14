@@ -29,6 +29,10 @@ class Action(IntEnum):
     BET_OVERBET = 10          # Overbet ~1.25x pot (110-150% region)
     DONK_SMALL = 11           # Donk lead ~1/4 pot (flop/turn OOP probe)
     DONK_MEDIUM = 12          # Donk lead ~1/2 pot (flop/turn OOP lead)
+    # v9 additions — fill gaps identified by WeirdSizingBot analysis
+    BET_QUARTER_POT = 13      # Bet/raise ~1/4 pot (fills check ↔ bet_third gap)
+    BET_THREE_QUARTER_POT = 14  # Bet/raise ~3/4 pot (fills 2/3 ↔ pot gap)
+    BET_DOUBLE_POT = 15       # Bet/raise ~2x pot (fills overbet ↔ all-in gap)
 
 
 ACTION_NAMES = {
@@ -45,6 +49,9 @@ ACTION_NAMES = {
     Action.FOUR_BET: "4-bet",
     Action.DONK_SMALL: "donk small",
     Action.DONK_MEDIUM: "donk medium",
+    Action.BET_QUARTER_POT: "bet 1/4 pot",
+    Action.BET_THREE_QUARTER_POT: "bet 3/4 pot",
+    Action.BET_DOUBLE_POT: "bet 2x pot",
 }
 
 
@@ -276,10 +283,12 @@ def _postflop_actions(has_bet_to_call: bool, can_raise: bool,
                             Action.BET_TWO_THIRDS_POT, Action.BET_POT,
                             Action.ALL_IN])
         else:
-            # Standard postflop: full sizing menu
-            actions.extend([Action.BET_THIRD_POT, Action.BET_HALF_POT,
-                            Action.BET_TWO_THIRDS_POT, Action.BET_POT,
-                            Action.BET_OVERBET, Action.ALL_IN])
+            # Standard postflop: full sizing menu (v9: +quarter, +3/4, +double)
+            actions.extend([Action.BET_QUARTER_POT, Action.BET_THIRD_POT,
+                            Action.BET_HALF_POT, Action.BET_TWO_THIRDS_POT,
+                            Action.BET_THREE_QUARTER_POT, Action.BET_POT,
+                            Action.BET_OVERBET, Action.BET_DOUBLE_POT,
+                            Action.ALL_IN])
 
     return actions
 
@@ -304,9 +313,11 @@ def count_raises(history: tuple[int, ...], phase: str = 'postflop') -> int:
     """Count the number of raises in the current action sequence."""
     raise_actions = {
         int(Action.OPEN_RAISE), int(Action.THREE_BET), int(Action.FOUR_BET),
-        int(Action.BET_THIRD_POT), int(Action.BET_HALF_POT),
-        int(Action.BET_TWO_THIRDS_POT), int(Action.BET_POT),
-        int(Action.BET_OVERBET), int(Action.ALL_IN),
+        int(Action.BET_QUARTER_POT), int(Action.BET_THIRD_POT),
+        int(Action.BET_HALF_POT), int(Action.BET_TWO_THIRDS_POT),
+        int(Action.BET_THREE_QUARTER_POT), int(Action.BET_POT),
+        int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
+        int(Action.ALL_IN),
         int(Action.DONK_SMALL), int(Action.DONK_MEDIUM),
     }
     return sum(1 for a in history if a in raise_actions)
@@ -348,11 +359,14 @@ _POSTFLOP_CONCRETE_MAP: dict[str, int] = {
     "donk_medium":   int(Action.DONK_MEDIUM),
     "all_in":        int(Action.ALL_IN),
     # Eval harness / match_engine names
-    "bet_third":      int(Action.BET_THIRD_POT),
-    "bet_half":       int(Action.BET_HALF_POT),
-    "bet_two_thirds": int(Action.BET_TWO_THIRDS_POT),
-    "bet_pot":        int(Action.BET_POT),
-    "bet_overbet":    int(Action.BET_OVERBET),
+    "bet_quarter":     int(Action.BET_QUARTER_POT),
+    "bet_third":       int(Action.BET_THIRD_POT),
+    "bet_half":        int(Action.BET_HALF_POT),
+    "bet_two_thirds":  int(Action.BET_TWO_THIRDS_POT),
+    "bet_three_quarter": int(Action.BET_THREE_QUARTER_POT),
+    "bet_pot":         int(Action.BET_POT),
+    "bet_overbet":     int(Action.BET_OVERBET),
+    "bet_double_pot":  int(Action.BET_DOUBLE_POT),
 }
 
 

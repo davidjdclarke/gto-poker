@@ -1,0 +1,172 @@
+[
+  {
+    "iterations": 10000000,
+    "nodes": 986341,
+    "timestamp": "20260313_185815",
+    "file": "checkpoints/ckpt_10000000.json",
+    "exploitability": 130.1037,
+    "gauntlet": {
+      "NitBot": -857.1,
+      "AggroBot": 1919.0,
+      "OverfoldBot": -3084.0,
+      "CallStationBot": 188.0,
+      "DonkBot": -1101.0,
+      "WeirdSizingBot": -4047.5,
+      "PerturbBot": -3219.2,
+      "avg_bb_per_100": -1457.4
+    }
+  },
+  {
+    "iterations": 20000000,
+    "nodes": 1033946,
+    "timestamp": "20260313_190406",
+    "file": "checkpoints/ckpt_20000000.json",
+    "exploitability": 123.1745,
+    "gauntlet": {
+      "NitBot": -1285.0,
+      "AggroBot": -455.7,
+      "OverfoldBot": -2064.1,
+      "CallStationBot": -236.0,
+      "DonkBot": -1101.0,
+      "WeirdSizingBot": -4047.5,
+      "PerturbBot": -3219.2,
+      "avg_bb_per_100": -1772.7
+    }
+  },
+  {
+    "iterations": 30000000,
+    "nodes": 1045181,
+    "timestamp": "20260313_190940",
+    "file": "checkpoints/ckpt_30000000.json",
+    "exploitability": 1.3798,
+    "gauntlet": {
+      "NitBot": 607.0,
+      "AggroBot": 443.0,
+      "OverfoldBot": 219.7,
+      "CallStationBot": 1065.6,
+      "DonkBot": -218.2,
+      "WeirdSizingBot": 698.4,
+      "PerturbBot": 483.6,
+      "avg_bb_per_100": 471.3
+    }
+  },
+  {
+    "iterations": 40000000,
+    "nodes": 1049391,
+    "timestamp": "20260313_191515",
+    "file": "checkpoints/ckpt_40000000.json",
+    "exploitability": 1.3108,
+    "gauntlet": {
+      "NitBot": 634.0,
+      "AggroBot": 657.5,
+      "OverfoldBot": 121.5,
+      "CallStationBot": 1157.4,
+      "DonkBot": 37.1,
+      "WeirdSizingBot": 394.0,
+      "PerturbBot": -174.3,
+      "avg_bb_per_100": 403.9
+    }
+  },
+  {
+    "iterations": 50000000,
+    "nodes": 1051469,
+    "timestamp": "20260313_192119",
+    "file": "checkpoints/ckpt_50000000.json",
+    "exploitability": 1.324,
+    "gauntlet": {
+      "NitBot": 685.0,
+      "AggroBot": 750.0,
+      "OverfoldBot": 114.3,
+      "CallStationBot": 683.0,
+      "DonkBot": -66.3,
+      "WeirdSizingBot": 464.0,
+      "PerturbBot": -281.6,
+      "avg_bb_per_100": 335.5
+    }
+  },
+  {
+    "iterations": 60000000,
+    "nodes": 1052773,
+    "timestamp": "20260313_192656",
+    "file": "checkpoints/ckpt_60000000.json",
+    "exploitability": 1.3452,
+    "gauntlet": {
+      "NitBot": 586.2,
+      "AggroBot": 479.4,
+      "OverfoldBot": 111.3,
+      "CallStationBot": 782.9,
+      "DonkBot": 28.0,
+      "WeirdSizingBot": 204.2,
+      "PerturbBot": -260.4,
+      "avg_bb_per_100": 275.9
+    }
+  },
+  {
+    "iterations": 70000000,
+    "nodes": 1053584,
+    "timestamp": "20260313_193228",
+    "file": "checkpoints/ckpt_70000000.json",
+    "exploitability": 1.2734,
+    "gauntlet": {
+      "NitBot": 626.9,
+      "AggroBot": 644.0,
+      "OverfoldBot": 114.3,
+      "CallStationBot": 883.5,
+      "DonkBot": 352.9,
+      "WeirdSizingBot": 87.2,
+      "PerturbBot": 1110.7,
+      "avg_bb_per_100": 545.6
+    }
+  },
+  {
+    "iterations": 80000000,
+    "nodes": 1054189,
+    "timestamp": "20260313_193801",
+    "file": "checkpoints/ckpt_80000000.json",
+    "exploitability": 1.2782,
+    "gauntlet": {
+      "NitBot": 754.7,
+      "AggroBot": 400.1,
+      "OverfoldBot": 114.5,
+      "CallStationBot": 888.6,
+      "DonkBot": 355.2,
+      "WeirdSizingBot": -28.3,
+      "PerturbBot": -551.8,
+      "avg_bb_per_100": 276.1
+    }
+  },
+  {
+    "iterations": 90000000,
+    "nodes": 1054658,
+    "timestamp": "20260313_194331",
+    "file": "checkpoints/ckpt_90000000.json",
+    "exploitability": 1.2544,
+    "gauntlet": {
+      "NitBot": 862.6,
+      "AggroBot": 523.8,
+      "OverfoldBot": 114.6,
+      "CallStationBot": 887.1,
+      "DonkBot": 649.7,
+      "WeirdSizingBot": 600.6,
+      "PerturbBot": 367.7,
+      "avg_bb_per_100": 572.3
+    }
+  },
+  {
+    "iterations": 100000000,
+    "nodes": 1055003,
+    "timestamp": "20260313_194900",
+    "file": "checkpoints/ckpt_100000000.json",
+    "exploitability": 1.332,
+    "gauntlet": {
+      "NitBot": 718.5,
+      "AggroBot": 893.4,
+      "OverfoldBot": 115.9,
+      "CallStationBot": 1071.4,
+      "DonkBot": 1024.0,
+      "WeirdSizingBot": 220.4,
+      "PerturbBot": 696.7,
+      "avg_bb_per_100": 677.2
+    }
+  }
+]

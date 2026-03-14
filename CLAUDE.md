@@ -130,6 +130,10 @@ class Action(IntEnum):
     BET_OVERBET        = 10  # ~1.25x pot
     DONK_SMALL         = 11  # OOP lead ~1/4 pot
     DONK_MEDIUM        = 12  # OOP lead ~1/2 pot
+    # v9 additions (fills WeirdSizingBot translation gaps)
+    BET_QUARTER_POT         = 13  # ~1/4 pot (check ↔ bet_third gap)
+    BET_THREE_QUARTER_POT   = 14  # ~3/4 pot (2/3 ↔ pot gap)
+    BET_DOUBLE_POT          = 15  # ~2x pot (overbet ↔ all-in gap)
 ```
 
 ---
@@ -276,74 +280,91 @@ Flop and Turn get 2x iterations per training cycle. Cython (`cfr_fast.pyx`) has 
 
 ```bash
 venv/bin/python train_gto.py \
-    --iterations 5000000 \    # 5M per run, cumulative from previous save
-    --workers 6 \             # parallel workers (shared-memory node pool)
-    --averaging-delay 100000  # linear weighting starts after 100k iters
+    --iterations 5000000 \        # 5M per run, cumulative from previous save
+    --workers 6 \                 # parallel workers (shared-memory node pool)
+    --averaging-delay 100000 \    # linear weighting starts after 100k iters
+    --phase-schedule 2x \         # 2x or 3x flop/turn emphasis
+    --allin-dampen old \          # old (rc<2,0.7x) or new (rc==0,0.5x)
+    --regret-discount 0.995 \     # DCFR: discount factor <1.0 (1.0=CFR+)
+    --weight-schedule exponential \ # linear/exponential/polynomial
+    --weight-param 1.001 \        # base for exp, power for polynomial
+    --checkpoint-interval 10000000 \ # save checkpoint every N iters
+    --checkpoint-eval \           # compute exploitability at checkpoints
+    --checkpoint-gauntlet         # run quick gauntlet at checkpoints
 ```
 
 **Performance:** ~0.03–0.04 ms/iter with Cython (6 workers), ~29 min for 50M iterations total.
 
+### Solver Dynamics Options (v9)
+
+- **CFR+ (default):** `--regret-discount 1.0` — standard regret flooring, no decay
+- **DCFR:** `--regret-discount 0.995` — discount old regrets by gamma each iteration
+- **Weight schedules:** `--weight-schedule linear` (default), `exponential`, `polynomial`
+  - Exponential: weight = param^(t-delay). Try `--weight-param 1.001`
+  - Polynomial: weight = (t-delay)^param. Try `--weight-param 2.0`
+
+### Evaluation Diagnostics (v9)
+
+```python
+# EV decomposition (requires detailed_tracking=True)
+from eval_harness.ev_decomposition import decompose_by_street, callstation_dashboard
+match = HeadsUpMatch(gto, opponent, detailed_tracking=True)
+result = match.play(5000)
+street_ev = decompose_by_street(result.hands, big_blind=20)
+dashboard = callstation_dashboard(result.hands, big_blind=20)
+
+# Bridge pain map
+from eval_harness.bridge_pain import analyze_bridge_pain, format_pain_map
+analysis = analyze_bridge_pain(gto.bridge_log, result.hands, big_blind=20)
+print(format_pain_map(analysis))
+```
+
 ---
 
-## Current State (v7, 67M iterations — 2026-03-13)
+## Current State (v9-B0, 100M iterations — 2026-03-14)
 
-**Exploitability: 1.2311 bb/100** (3-seed eval harness)
-**Per-phase:** Preflop 1.02, Flop 1.30, Turn 1.34, River 1.13
-**Nodes:** 1,052,718 (100% well-visited) | **Strategy:** `server/gto/strategy.json`
-**Experiment:** `experiments/v6_67.0M_20260313_100101_strategy.json`
-**Eval results:** `eval_results/eval_1773413264.json`
+**Exploitability: 1.2211 bb/100** (3-seed eval harness)
+**Preflop exploitability:** 1.0204
+**Nodes:** 1,055,003 | **Strategy:** `server/gto/strategy.json` (old 13-action abstraction)
+**Experiment:** `experiments/v6_100.0M_20260313_195215_strategy.json`
+**Checkpoint log:** `checkpoints/checkpoint_log.json`
 
-### Gauntlet Results (v7 67M)
+### Gauntlet Results (V9-B0 100M)
 
-| Bot | 67M bb/100 | 50M bb/100 | Change |
-|-----|-----------|-------------|--------|
-| AggroBot | +179.4 | +365.6 | regressed |
-| OverfoldBot | **+107.8** | -291.4 | ✓ FIXED |
-| DonkBot | +293.9 | +266.5 | improved |
-| WeirdSizingBot | **-952.4** | -852.7 | worse |
-| PerturbBot | **-366.0** | -210.4 | worse |
-| NitBot | **-409.3** | +235.9 | regressed |
-| CallStationBot | **-437.0** | +439.5 | regressed |
-| **Average** | **-226.2** | -6.7 | regressed |
+| Bot | V9-B0 (100M) | v7 (67M) | Delta |
+|-----|-------------|----------|-------|
+| NitBot | **+718.5** | -409.3 | +1128 |
+| AggroBot | **+893.4** | +179.4 | +714 |
+| OverfoldBot | **+115.9** | +107.8 | +8 |
+| CallStationBot | **+1071.4** | -437.0 | +1508 |
+| DonkBot | **+1024.0** | +293.9 | +730 |
+| WeirdSizingBot | **+220.4** | -952.4 | +1173 |
+| PerturbBot | **+696.7** | -366.0 | +1063 |
+| **Average** | **+677.2** | -226.2 | **+903** |
 
-### Bridge Mapping Results (v7 67M)
+All 7 bots now positive. Config: 2x phase schedule + old all-in dampening (rc<2, 0.7x).
 
-| Mapping | AggroBot | CallStation | WeirdSizing | **Avg** |
-|---------|----------|-------------|-------------|---------|
-| **nearest** | +291.2 | -387.7 | +464.0 | **+122.5** ← default |
-| conservative | +40.5 | +733.7 | -555.0 | +73.1 |
-| stochastic | +297.2 | +819.9 | -1045.6 | +23.8 |
-| resolve | +9.9 | -66.7 | -1065.0 | -373.9 |
-
-`nearest` remains best overall. River bluff ratio dropped to 27.3% (from 35.1% at 50M) which likely explains CallStation/NitBot regressions.
-
-### What changed v6 → v7
-- Reverted broken RCA "fixes" that caused exploitability regression to 1.82–1.87:
-  - `cfr_fast.pyx`: removed `eq_bucket >= 2` donk restriction (was changing EQ0/EV1 from 6→7 actions)
-  - `cfr_fast.pyx` + `cfr.py`: all-in dampening back to `raise_count < 2`, 0.7×
-  - `abstraction.py`: removed `eq_bucket >= 2` from `get_available_actions()` to match training
-- Fixed `exploitability.py` RNG sharing bug: br0/br1 now use isolated `Random(seed)` instances
-- Changed GTOAgent default mapping `conservative` → `nearest` (conservative now -33.5 avg)
+### What changed v7 → v9-B0
+- **Training config:** 2x phase schedule (was 3x), old all-in dampening, 100M iterations (was 67M)
+- **v9 infrastructure (code only, not yet trained):**
+  - Phase 0: EV decomposition, bridge pain map, checkpoint gauntlet
+  - Phase 2: DCFR regret discounting, pluggable weight schedules
+  - Phase 3A: 3 new postflop bet sizes (BET_QUARTER_POT=13, BET_THREE_QUARTER_POT=14, BET_DOUBLE_POT=15)
+- **Note:** The v9-B0 strategy uses the OLD 13-action abstraction. Phase 3A code is ready but requires a full retrain with the new 16-action abstraction.
 
 ### Known Issues
 
-| Issue | Severity | Description | Fix |
-|-------|----------|-------------|-----|
-| NitBot -409.3 | **Critical** | Regressed from +235.9 at 50M — over-convergence reducing aggression | Investigate bluff frequency drop |
-| CallStationBot -437.0 | **Critical** | Regressed from +439.5 at 50M — river bluff ratio dropped 35%→27% | River bluff frequency too low |
-| WeirdSizingBot -952.4 | High | Large loss to off-tree sizings (worse than 50M) | Translation improvements |
-| PerturbBot -366.0 | High | Losing to near-random play (worse than 50M) | Investigate |
+| Issue | Severity | Description | Status |
+|-------|----------|-------------|--------|
+| WeirdSizingBot +220 | Medium | Positive but weakest matchup — Phase 3A grid expansion should help | Phase 3A code ready, needs retrain |
 | EQ0 river 100% bet | Medium | Specific EQ0 nodes still 100% bet on river | Structural abstraction limit |
-| Premium pair limp | Medium | 4 nodes: PREMIUM/HIGH_PAIR at EQ5/EQ6 limp 21-100% | Rare unconverged path |
-| Strong hand fold | Medium | EQ6 folds 100% — bucket boundary artifact | Widen equity bucket ranges |
-| All-in overuse | Medium | 458 nodes flagged (was 520) | Dampening too broad |
-| Flat strategies | Medium | 1,035 nodes (was 1,334) | Improving with iterations |
-| Frequency anomalies | Low | 17,669 nodes (was 65,814) | Improving with iterations |
-| OverfoldBot -291.4 | ~~High~~ **FIXED** | Now +107.8 at 67M | — |
-| #2 Bridge default | ~~Critical~~ **FIXED** | Now `nearest` | match_engine.py |
-| #3 engine.py history | ~~High~~ **FIXED** | BET_HALF_POT + aliases added | engine.py |
+| Strategy on old abstraction | Info | Current strategy.json uses 13 actions, code now has 16 | Retrain needed after Phase 3A |
+| NitBot +718 | ~~Critical~~ **FIXED** | Was -409 at v7 67M | 2x schedule + old dampening |
+| CallStationBot +1071 | ~~Critical~~ **FIXED** | Was -437 at v7 67M | 2x schedule + old dampening |
+| PerturbBot +697 | ~~High~~ **FIXED** | Was -366 at v7 67M | 2x schedule + old dampening |
+| WeirdSizingBot -952 | ~~High~~ **FIXED** | Now +220 at v9-B0 | 2x schedule + old dampening |
 
-Full details: `RCA_v6_50M.md`
+Full details: `docs/results/v9_B0_100M_20260314.md`
 
 ---
 
@@ -354,6 +375,7 @@ Full details: `RCA_v6_50M.md`
 Each results doc should include: exploitability, gauntlet table, bridge mapping A/B, off-tree stress test, strategy audit, and a comparison to the previous iteration. This creates a historical record of how the strategy evolves over time.
 
 Existing results:
+- `docs/results/v9_B0_100M_20260314.md` — v9-B0 baseline at 100M iterations (current)
 - `docs/results/v7_67M_20260313.md` — v7 at 67M iterations
 
 ## Action Plans
@@ -361,6 +383,8 @@ Existing results:
 **Before starting a new improvement cycle, create an action plan in `docs/plans/`** describing the goals, hypotheses, and planned changes. Update the plan as work progresses. This provides a decision log for why changes were made.
 
 Existing plans:
+- `docs/plans/ACTION_PLAN_v9.md` — v9 improvement plan (current)
+- `docs/plans/ACTION_PLAN_v8_ablations.md` — v8 ablation study plan
 - `docs/plans/ACTION_PLAN_v7.md` — v7 improvement plan
 
 ---

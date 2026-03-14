@@ -73,9 +73,11 @@ class ConservativeGTOAgent(Agent):
         # This simulates "when in doubt, take the safer line"
         if int(Action.CHECK_CALL) in strategy:
             boost = 0.0
-            for a in [int(Action.BET_THIRD_POT), int(Action.BET_HALF_POT),
-                       int(Action.BET_TWO_THIRDS_POT), int(Action.BET_POT),
-                       int(Action.BET_OVERBET),
+            for a in [int(Action.BET_QUARTER_POT), int(Action.BET_THIRD_POT),
+                       int(Action.BET_HALF_POT),
+                       int(Action.BET_TWO_THIRDS_POT), int(Action.BET_THREE_QUARTER_POT),
+                       int(Action.BET_POT),
+                       int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
                        int(Action.DONK_SMALL), int(Action.DONK_MEDIUM)]:
                 if a in strategy:
                     steal = strategy[a] * 0.15
@@ -254,11 +256,14 @@ class ResolveGTOAgent(Agent):
         pot_odds_map = {
             int(Action.DONK_SMALL): 0.25 / (1.0 + 0.25),       # ~20%
             int(Action.DONK_MEDIUM): 0.50 / (1.0 + 0.50),      # ~33%
+            int(Action.BET_QUARTER_POT): 0.25 / (1.0 + 0.25),  # ~20%
             int(Action.BET_THIRD_POT): 0.33 / (1.0 + 0.33),    # ~25%
             int(Action.BET_HALF_POT): 0.50 / (1.0 + 0.50),     # ~33%
             int(Action.BET_TWO_THIRDS_POT): 0.67 / (1.0 + 0.67),  # ~40%
+            int(Action.BET_THREE_QUARTER_POT): 0.75 / (1.0 + 0.75),  # ~43%
             int(Action.BET_POT): 1.0 / (1.0 + 1.0),            # ~50%
             int(Action.BET_OVERBET): 1.25 / (1.0 + 1.25),      # ~56%
+            int(Action.BET_DOUBLE_POT): 2.0 / (1.0 + 2.0),     # ~67%
             int(Action.ALL_IN): 0.6,                             # varies
             int(Action.OPEN_RAISE): 0.4,
             int(Action.THREE_BET): 0.35,
@@ -282,12 +287,15 @@ def _get_neighbor_histories(history: tuple, phase: str) -> list:
     # Postflop sizing neighbors
     sizing_chain = [
         int(Action.DONK_SMALL),
+        int(Action.BET_QUARTER_POT),
         int(Action.BET_THIRD_POT),
         int(Action.DONK_MEDIUM),
         int(Action.BET_HALF_POT),
         int(Action.BET_TWO_THIRDS_POT),
+        int(Action.BET_THREE_QUARTER_POT),
         int(Action.BET_POT),
         int(Action.BET_OVERBET),
+        int(Action.BET_DOUBLE_POT),
     ]
 
     if last in sizing_chain:
@@ -320,11 +328,14 @@ def _agent_abstract_to_concrete(action: Action, ctx: HandContext) -> AgentDecisi
         Action.OPEN_RAISE: max(ctx.min_raise, int(ctx.big_blind * 2.5)),
         Action.THREE_BET: max(ctx.min_raise, ctx.current_bet * 3),
         Action.FOUR_BET: max(ctx.min_raise, int(ctx.current_bet * 2.2)),
+        Action.BET_QUARTER_POT: max(ctx.min_raise, ctx.pot // 4),
         Action.BET_THIRD_POT: max(ctx.min_raise, ctx.pot // 3),
         Action.BET_HALF_POT: max(ctx.min_raise, ctx.pot // 2),
         Action.BET_TWO_THIRDS_POT: max(ctx.min_raise, int(ctx.pot * 2 / 3)),
+        Action.BET_THREE_QUARTER_POT: max(ctx.min_raise, int(ctx.pot * 3 / 4)),
         Action.BET_POT: max(ctx.min_raise, ctx.pot),
         Action.BET_OVERBET: max(ctx.min_raise, int(ctx.pot * 1.25)),
+        Action.BET_DOUBLE_POT: max(ctx.min_raise, ctx.pot * 2),
         Action.DONK_SMALL: max(ctx.min_raise, ctx.pot // 4),
         Action.DONK_MEDIUM: max(ctx.min_raise, ctx.pot // 2),
     }

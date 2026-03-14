@@ -20,9 +20,12 @@ from server.gto.abstraction import (
 PHASES = ['preflop', 'flop', 'turn', 'river']
 
 BET_ACTIONS = {
-    int(Action.BET_THIRD_POT), int(Action.BET_HALF_POT),
-    int(Action.BET_TWO_THIRDS_POT), int(Action.BET_POT),
-    int(Action.BET_OVERBET), int(Action.ALL_IN),
+    int(Action.BET_QUARTER_POT), int(Action.BET_THIRD_POT),
+    int(Action.BET_HALF_POT),
+    int(Action.BET_TWO_THIRDS_POT), int(Action.BET_THREE_QUARTER_POT),
+    int(Action.BET_POT),
+    int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
+    int(Action.ALL_IN),
     int(Action.OPEN_RAISE), int(Action.THREE_BET), int(Action.FOUR_BET),
     int(Action.DONK_SMALL), int(Action.DONK_MEDIUM),
 }

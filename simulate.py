@@ -417,11 +417,14 @@ class PokerSimulation:
             Action.OPEN_RAISE: 2.5 * self.big_blind,
             Action.THREE_BET: 3.0 * self.current_bet,
             Action.FOUR_BET: 2.5 * self.current_bet,
+            Action.BET_QUARTER_POT: max(self.pot * 0.25, self.min_raise),
             Action.BET_THIRD_POT: max(self.pot * 0.33, self.min_raise),
             Action.BET_HALF_POT: max(self.pot * 0.5, self.min_raise),
             Action.BET_TWO_THIRDS_POT: max(self.pot * 0.67, self.min_raise),
+            Action.BET_THREE_QUARTER_POT: max(self.pot * 0.75, self.min_raise),
             Action.BET_POT: max(self.pot, self.min_raise),
             Action.BET_OVERBET: max(self.pot * 1.25, self.min_raise),
+            Action.BET_DOUBLE_POT: max(self.pot * 2.0, self.min_raise),
             Action.DONK_SMALL: max(self.pot * 0.25, self.min_raise),
             Action.DONK_MEDIUM: max(self.pot * 0.5, self.min_raise),
         }
@@ -442,11 +445,14 @@ class PokerSimulation:
         mapping = {
             "check": int(Action.CHECK_CALL),
             "call": int(Action.CHECK_CALL),
+            "bet_quarter": int(Action.BET_QUARTER_POT),
             "bet_third": int(Action.BET_THIRD_POT),
             "bet_half": int(Action.BET_HALF_POT),
             "bet_two_thirds": int(Action.BET_TWO_THIRDS_POT),
+            "bet_three_quarter": int(Action.BET_THREE_QUARTER_POT),
             "bet_pot": int(Action.BET_POT),
             "bet_overbet": int(Action.BET_OVERBET),
+            "bet_double_pot": int(Action.BET_DOUBLE_POT),
             "donk_small": int(Action.DONK_SMALL),
             "donk_medium": int(Action.DONK_MEDIUM),
             "all_in": int(Action.ALL_IN),
@@ -455,8 +461,9 @@ class PokerSimulation:
             "four_bet": int(Action.FOUR_BET),
         }
         raise_actions = {"open_raise", "three_bet", "four_bet",
-                         "bet_third", "bet_half", "bet_two_thirds",
-                         "bet_pot", "bet_overbet",
+                         "bet_quarter", "bet_third", "bet_half",
+                         "bet_two_thirds", "bet_three_quarter",
+                         "bet_pot", "bet_overbet", "bet_double_pot",
                          "donk_small", "donk_medium", "all_in"}
 
         if not self.round_history:
@@ -487,9 +494,12 @@ class PokerSimulation:
         if not history:
             return False
         bet_actions = {
-            int(Action.BET_THIRD_POT), int(Action.BET_HALF_POT),
-            int(Action.BET_TWO_THIRDS_POT), int(Action.BET_POT),
-            int(Action.BET_OVERBET), int(Action.ALL_IN),
+            int(Action.BET_QUARTER_POT), int(Action.BET_THIRD_POT),
+            int(Action.BET_HALF_POT),
+            int(Action.BET_TWO_THIRDS_POT), int(Action.BET_THREE_QUARTER_POT),
+            int(Action.BET_POT),
+            int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
+            int(Action.ALL_IN),
             int(Action.OPEN_RAISE), int(Action.THREE_BET),
             int(Action.FOUR_BET),
             int(Action.DONK_SMALL), int(Action.DONK_MEDIUM),

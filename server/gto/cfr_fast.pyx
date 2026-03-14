@@ -42,6 +42,10 @@ cdef int ACT_BET_TWO_THIRDS = 9
 cdef int ACT_BET_OVERBET = 10
 cdef int ACT_DONK_SMALL = 11
 cdef int ACT_DONK_MEDIUM = 12
+# v9 additions
+cdef int ACT_BET_QUARTER = 13
+cdef int ACT_BET_THREE_QUARTER = 14
+cdef int ACT_BET_DOUBLE_POT = 15
 
 cdef int MAX_HISTORY = 12
 
@@ -83,9 +87,12 @@ cdef inline int rand_int(int n) noexcept nogil:
 # --- Terminal / street checks (pure C) ---
 
 cdef inline bint is_raise_action(int action) noexcept nogil:
-    return (action == ACT_BET_THIRD or action == ACT_BET_HALF or
-            action == ACT_BET_TWO_THIRDS or action == ACT_BET_POT or
-            action == ACT_BET_OVERBET or action == ACT_ALL_IN or
+    return (action == ACT_BET_QUARTER or action == ACT_BET_THIRD or
+            action == ACT_BET_HALF or
+            action == ACT_BET_TWO_THIRDS or action == ACT_BET_THREE_QUARTER or
+            action == ACT_BET_POT or
+            action == ACT_BET_OVERBET or action == ACT_BET_DOUBLE_POT or
+            action == ACT_ALL_IN or
             action == ACT_OPEN_RAISE or action == ACT_THREE_BET or
             action == ACT_FOUR_BET or
             action == ACT_DONK_SMALL or action == ACT_DONK_MEDIUM)
@@ -164,16 +171,22 @@ cdef void player_investments(int* history, int hlen,
             outstanding = 0.0
             total_pot = inv0[0] + inv1[0]
 
-            if action == ACT_BET_THIRD:
+            if action == ACT_BET_QUARTER:
+                bet = total_pot * 0.25
+            elif action == ACT_BET_THIRD:
                 bet = total_pot * 0.33
             elif action == ACT_BET_HALF:
                 bet = total_pot * 0.5
             elif action == ACT_BET_TWO_THIRDS:
                 bet = total_pot * 0.67
+            elif action == ACT_BET_THREE_QUARTER:
+                bet = total_pot * 0.75
             elif action == ACT_BET_POT:
                 bet = total_pot * 1.0
             elif action == ACT_BET_OVERBET:
                 bet = total_pot * 1.25
+            elif action == ACT_BET_DOUBLE_POT:
+                bet = total_pot * 2.0
             elif action == ACT_OPEN_RAISE:
                 bet = total_pot * 0.75
             elif action == ACT_THREE_BET:
@@ -280,12 +293,15 @@ cdef int get_postflop_actions(bint has_bet, bint can_raise,
             out_actions[n] = ACT_BET_POT; n += 1
             out_actions[n] = ACT_ALL_IN; n += 1
         else:
-            # Standard postflop: full sizing menu
+            # Standard postflop: full sizing menu (v9: +quarter, +3/4, +double)
+            out_actions[n] = ACT_BET_QUARTER; n += 1
             out_actions[n] = ACT_BET_THIRD; n += 1
             out_actions[n] = ACT_BET_HALF; n += 1
             out_actions[n] = ACT_BET_TWO_THIRDS; n += 1
+            out_actions[n] = ACT_BET_THREE_QUARTER; n += 1
             out_actions[n] = ACT_BET_POT; n += 1
             out_actions[n] = ACT_BET_OVERBET; n += 1
+            out_actions[n] = ACT_BET_DOUBLE_POT; n += 1
             out_actions[n] = ACT_ALL_IN; n += 1
     return n
 
@@ -308,8 +324,8 @@ cdef int get_actions(bint has_bet, bint can_raise, bint is_preflop,
 cdef struct NodeData:
     int num_actions
     int first_visit_iter   # iteration when this node was first visited (-1 = unvisited)
-    double regret_sum[13]
-    double strategy_sum[13]
+    double regret_sum[16]
+    double strategy_sum[16]
 
 
 cdef void node_get_strategy(NodeData* node, double* out_strategy) noexcept nogil:
@@ -330,9 +346,12 @@ cdef void node_get_strategy(NodeData* node, double* out_strategy) noexcept nogil
             out_strategy[i] = uniform
 
 
-cdef void node_update_regrets(NodeData* node, double* regrets) noexcept nogil:
+cdef void node_update_regrets(NodeData* node, double* regrets,
+                               double discount) noexcept nogil:
     cdef int i
     for i in range(node.num_actions):
+        if discount < 1.0:
+            node.regret_sum[i] *= discount
         node.regret_sum[i] += regrets[i]
         if node.regret_sum[i] < 0:
             node.regret_sum[i] = 0.0
@@ -418,6 +437,11 @@ cdef int _adaptive_averaging = 0   # 0=global (default), 1=per-node adaptive
 cdef int _current_iter = 0         # current iteration (set by train_fast per iteration)
 cdef int _global_averaging_delay = 0  # global averaging delay (set by train_fast)
 
+# --- DCFR / weight schedule config (set by train_fast) ---
+cdef double _regret_discount = 1.0     # 1.0=CFR+, <1.0=DCFR (e.g. 0.995)
+cdef int _weight_schedule_mode = 0     # 0=linear, 1=exponential, 2=polynomial
+cdef double _weight_schedule_param = 1.0  # base for exp, power for polynomial
+
 
 def init_progress_counters(int num_workers):
     """Allocate shared-memory progress counters (call before fork)."""
@@ -469,7 +493,7 @@ cdef int get_or_create_node(long long key, int num_actions) noexcept:
         # If action menu changed (e.g. version upgrade), reinitialize the node
         if node_pool[idx].num_actions != num_actions:
             node_pool[idx].num_actions = num_actions
-            for i in range(13):
+            for i in range(16):
                 node_pool[idx].regret_sum[i] = 0.0
                 node_pool[idx].strategy_sum[i] = 0.0
         return idx
@@ -486,7 +510,7 @@ cdef int get_or_create_node(long long key, int num_actions) noexcept:
 
     node_pool[idx].num_actions = num_actions
     node_pool[idx].first_visit_iter = -1
-    for i in range(13):
+    for i in range(16):
         node_pool[idx].regret_sum[i] = 0.0
         node_pool[idx].strategy_sum[i] = 0.0
 
@@ -603,18 +627,18 @@ cdef double cfr_single_street(int phase, int bucket_p0, int bucket_p1,
     cdef int bucket
     cdef bint hb, cr_bool, is_pf
     cdef int rc
-    cdef int actions[13]
+    cdef int actions[16]
     cdef int num_actions
     cdef long long key
     cdef int node_idx
     cdef NodeData* node
-    cdef double strategy[13]
+    cdef double strategy[16]
     cdef int new_history[12]
     cdef int i
     cdef int action_idx
-    cdef double action_utilities[13]
+    cdef double action_utilities[16]
     cdef double node_utility
-    cdef double regrets[13]
+    cdef double regrets[16]
     cdef double node_weight
     cdef int node_delay
 
@@ -705,7 +729,7 @@ cdef double cfr_single_street(int phase, int bucket_p0, int bucket_p1,
 
         # Re-derive pointer: recursion may have triggered _grow_pool()
         node = &node_pool[node_idx]
-        node_update_regrets(node, regrets)
+        node_update_regrets(node, regrets, _regret_discount)
         node_accumulate_strategy(node, strategy, node_weight)
 
     return node_utility
@@ -722,10 +746,10 @@ cdef double evaluate_street(int phase, int bucket_p0, int bucket_p1,
     cdef int bucket, position
     cdef bint hb, cr_bool, is_pf
     cdef int rc
-    cdef int actions[13]
+    cdef int actions[16]
     cdef int num_actions
     cdef long long key
-    cdef double sigma[13]
+    cdef double sigma[16]
     cdef int node_idx
     cdef double uniform
     cdef int action_idx
@@ -823,7 +847,9 @@ cdef void sample_street_buckets(int* out_buckets) noexcept nogil:
 
 def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
                unsigned int seed=42, int phase_schedule_mode=1,
-               int allin_dampen_mode=1, int adaptive_averaging=0):
+               int allin_dampen_mode=1, int adaptive_averaging=0,
+               double regret_discount=1.0, int weight_schedule_mode=0,
+               double weight_schedule_param=1.0):
     """
     Run CFR+ training entirely in Cython.
 
@@ -834,15 +860,22 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
         phase_schedule_mode: 0=2x (6-step), 1=3x (8-step, default)
         allin_dampen_mode: 0=old (rc<2, 0.7x), 1=new (rc==0, 0.5x, default)
         adaptive_averaging: 0=global delay (default), 1=per-node adaptive delay
+        regret_discount: DCFR discount (1.0=CFR+, <1.0=DCFR)
+        weight_schedule_mode: 0=linear, 1=exponential, 2=polynomial
+        weight_schedule_param: parameter for weight schedule
 
     Returns total iterations completed.
     """
     global _allin_dampen_mode, _phase_schedule_mode, _adaptive_averaging
     global _current_iter, _global_averaging_delay
+    global _regret_discount, _weight_schedule_mode, _weight_schedule_param
     _allin_dampen_mode = allin_dampen_mode
     _phase_schedule_mode = phase_schedule_mode
     _adaptive_averaging = adaptive_averaging
     _global_averaging_delay = averaging_delay
+    _regret_discount = regret_discount
+    _weight_schedule_mode = weight_schedule_mode
+    _weight_schedule_param = weight_schedule_param
 
     rng_seed(<unsigned long long>seed)
 
@@ -881,7 +914,18 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
     for i in range(num_iterations):
         t = start_iter + i + 1
         _current_iter = t
-        weight = <double>(t - averaging_delay) if t > averaging_delay else 0.0
+        # Compute strategy accumulation weight based on schedule mode
+        if t <= averaging_delay:
+            weight = 0.0
+        elif _weight_schedule_mode == 1:
+            # Exponential: param^(t - delay)
+            weight = _weight_schedule_param ** <double>(t - averaging_delay)
+        elif _weight_schedule_mode == 2:
+            # Polynomial: (t - delay)^param
+            weight = (<double>(t - averaging_delay)) ** _weight_schedule_param
+        else:
+            # Linear (default): t - delay
+            weight = <double>(t - averaging_delay)
 
         for s in range(schedule_len):
             phase = phase_schedule[s]
@@ -962,10 +1006,10 @@ def get_strategy_fast(int phase, int bucket, tuple history, str position=''):
     cdef int pos
     cdef bint hb, cr_bool, is_pf
     cdef int rc
-    cdef int actions[13]
+    cdef int actions[16]
     cdef int num_actions
     cdef long long key
-    cdef double avg_strat[13]
+    cdef double avg_strat[16]
     cdef int node_idx
     cdef double uniform
 

@@ -42,7 +42,8 @@ STRATEGY_VERSION = 6  # v6: 2/3pot, overbet, donk bets, all-in audit
 
 def _parallel_worker(worker_id, n_iters, start_iter, avg_delay, seed,
                      phase_schedule_mode=1, allin_dampen_mode=1,
-                     adaptive_averaging=0):
+                     adaptive_averaging=0, regret_discount=1.0,
+                     weight_schedule_mode=0, weight_schedule_param=1.0):
     """Worker function for parallel CFR training.
 
     Runs in a forked child process. The node_pool is in shared mmap memory,
@@ -55,7 +56,10 @@ def _parallel_worker(worker_id, n_iters, start_iter, avg_delay, seed,
                          averaging_delay=avg_delay, seed=seed,
                          phase_schedule_mode=phase_schedule_mode,
                          allin_dampen_mode=allin_dampen_mode,
-                         adaptive_averaging=adaptive_averaging)
+                         adaptive_averaging=adaptive_averaging,
+                         regret_discount=regret_discount,
+                         weight_schedule_mode=weight_schedule_mode,
+                         weight_schedule_param=weight_schedule_param)
 
 PHASES = ['preflop', 'flop', 'turn', 'river']
 
@@ -88,12 +92,14 @@ class CFRNode:
         else:
             return np.ones(self.num_actions) / self.num_actions
 
-    def update_regrets(self, regrets: np.ndarray):
+    def update_regrets(self, regrets: np.ndarray, discount: float = 1.0):
         """
-        Update cumulative regrets with CFR+ flooring (regret-matching+).
-        R^{+,T}(I,a) = max(R^{+,T-1}(I,a) + r^T(I,a), 0)
-        [Tammelin 2014, Algorithm 1 line 26]
+        Update cumulative regrets with optional DCFR discounting + CFR+ flooring.
+        R^{+,T}(I,a) = max(discount * R^{+,T-1}(I,a) + r^T(I,a), 0)
+        discount=1.0 gives standard CFR+. discount<1.0 gives DCFR.
         """
+        if discount < 1.0:
+            self.regret_sum *= discount
         self.regret_sum += regrets
         np.maximum(self.regret_sum, 0, out=self.regret_sum)
 
@@ -155,6 +161,9 @@ class CFRTrainer:
               phase_schedule_mode: int = 1,
               allin_dampen_mode: int = 1,
               adaptive_averaging: int = 0,
+              regret_discount: float = 1.0,
+              weight_schedule_mode: int = 0,
+              weight_schedule_param: float = 1.0,
               sampling: str = 'external',
               progress_callback=None,
               chunk_size: int = 5000,
@@ -186,18 +195,25 @@ class CFRTrainer:
                                             chunk_size=chunk_size,
                                             phase_schedule_mode=phase_schedule_mode,
                                             allin_dampen_mode=allin_dampen_mode,
-                                            adaptive_averaging=adaptive_averaging)
+                                            adaptive_averaging=adaptive_averaging,
+                                            regret_discount=regret_discount,
+                                            weight_schedule_mode=weight_schedule_mode,
+                                            weight_schedule_param=weight_schedule_param)
             else:
                 self._train_cython(num_iterations, averaging_delay,
                                    progress_callback=progress_callback,
                                    chunk_size=chunk_size,
                                    phase_schedule_mode=phase_schedule_mode,
                                    allin_dampen_mode=allin_dampen_mode,
-                                   adaptive_averaging=adaptive_averaging)
+                                   adaptive_averaging=adaptive_averaging,
+                                   regret_discount=regret_discount,
+                                   weight_schedule_mode=weight_schedule_mode,
+                                   weight_schedule_param=weight_schedule_param)
             return
 
         # Python fallback: store config for _cfr_single_street access
         self._allin_dampen_mode = allin_dampen_mode
+        self._regret_discount = regret_discount
         schedule = PHASE_SCHEDULE_3X if phase_schedule_mode == 1 else PHASE_SCHEDULE_2X
         start_iter = self.iterations
 
@@ -232,7 +248,10 @@ class CFRTrainer:
                       progress_callback=None, chunk_size: int = 5000,
                       phase_schedule_mode: int = 1,
                       allin_dampen_mode: int = 1,
-                      adaptive_averaging: int = 0):
+                      adaptive_averaging: int = 0,
+                      regret_discount: float = 1.0,
+                      weight_schedule_mode: int = 0,
+                      weight_schedule_param: float = 1.0):
         """Run training using Cython-accelerated CFR.
 
         Args:
@@ -241,6 +260,9 @@ class CFRTrainer:
             chunk_size: Number of iterations per chunk (controls update frequency).
             phase_schedule_mode: 0=2x, 1=3x (default).
             allin_dampen_mode: 0=old, 1=new (default).
+            regret_discount: DCFR discount factor (1.0=standard CFR+, <1.0=DCFR).
+            weight_schedule_mode: 0=linear, 1=exponential, 2=polynomial.
+            weight_schedule_param: parameter for weight schedule (base/power).
         """
         # Initialize Cython node pool
         _cfr_fast.init_pool()
@@ -262,6 +284,9 @@ class CFRTrainer:
                 phase_schedule_mode=phase_schedule_mode,
                 allin_dampen_mode=allin_dampen_mode,
                 adaptive_averaging=adaptive_averaging,
+                regret_discount=regret_discount,
+                weight_schedule_mode=weight_schedule_mode,
+                weight_schedule_param=weight_schedule_param,
             )
             done += batch
 
@@ -277,7 +302,10 @@ class CFRTrainer:
                                progress_callback=None, chunk_size: int = 5000,
                                phase_schedule_mode: int = 1,
                                allin_dampen_mode: int = 1,
-                               adaptive_averaging: int = 0):
+                               adaptive_averaging: int = 0,
+                               regret_discount: float = 1.0,
+                               weight_schedule_mode: int = 0,
+                               weight_schedule_param: float = 1.0):
         """Parallel CFR+ using shared memory and multiprocessing.
 
         Phase 1 (warmup): Single-threaded training to discover all game tree
@@ -320,6 +348,9 @@ class CFRTrainer:
                 phase_schedule_mode=phase_schedule_mode,
                 allin_dampen_mode=allin_dampen_mode,
                 adaptive_averaging=adaptive_averaging,
+                regret_discount=regret_discount,
+                weight_schedule_mode=weight_schedule_mode,
+                weight_schedule_param=weight_schedule_param,
             )
             done += batch
             if progress_callback:
@@ -346,7 +377,8 @@ class CFRTrainer:
                 target=_parallel_worker,
                 args=(w, w_iters, start, averaging_delay, w_seed,
                       phase_schedule_mode, allin_dampen_mode,
-                      adaptive_averaging))
+                      adaptive_averaging, regret_discount,
+                      weight_schedule_mode, weight_schedule_param))
             processes.append(p)
             p.start()
 
@@ -560,7 +592,8 @@ class CFRTrainer:
                 if action == Action.ALL_IN and raise_count < 2:
                     regrets[i] *= 0.7
 
-        node.update_regrets(regrets)
+        discount = getattr(self, '_regret_discount', 1.0)
+        node.update_regrets(regrets, discount=discount)
         node.accumulate_strategy(strategy, weight)
 
         return node_utility
@@ -622,7 +655,9 @@ class CFRTrainer:
         node_utility = strategy @ action_utilities
         opponent_reach = p1 if acting_player == 0 else p0
         sign = 1.0 if acting_player == 0 else -1.0
-        node.update_regrets(sign * opponent_reach * (action_utilities - node_utility))
+        discount = getattr(self, '_regret_discount', 1.0)
+        node.update_regrets(sign * opponent_reach * (action_utilities - node_utility),
+                            discount=discount)
 
         return node_utility
 
@@ -760,9 +795,12 @@ class CFRTrainer:
             # Preflop: BB is a forced bet — first actor faces a bet
             return phase == 'preflop'
         last = history[-1]
-        return last in (int(Action.BET_THIRD_POT), int(Action.BET_HALF_POT),
-                        int(Action.BET_TWO_THIRDS_POT), int(Action.BET_POT),
-                        int(Action.BET_OVERBET), int(Action.ALL_IN),
+        return last in (int(Action.BET_QUARTER_POT), int(Action.BET_THIRD_POT),
+                        int(Action.BET_HALF_POT),
+                        int(Action.BET_TWO_THIRDS_POT), int(Action.BET_THREE_QUARTER_POT),
+                        int(Action.BET_POT),
+                        int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
+                        int(Action.ALL_IN),
                         int(Action.OPEN_RAISE), int(Action.THREE_BET),
                         int(Action.FOUR_BET),
                         int(Action.DONK_SMALL), int(Action.DONK_MEDIUM))
@@ -792,9 +830,12 @@ class CFRTrainer:
             elif action == int(Action.CHECK_CALL):
                 inv[player] += outstanding
                 outstanding = 0.0
-            elif action in (int(Action.BET_THIRD_POT), int(Action.BET_HALF_POT),
-                            int(Action.BET_TWO_THIRDS_POT), int(Action.BET_POT),
-                            int(Action.BET_OVERBET), int(Action.ALL_IN),
+            elif action in (int(Action.BET_QUARTER_POT), int(Action.BET_THIRD_POT),
+                            int(Action.BET_HALF_POT),
+                            int(Action.BET_TWO_THIRDS_POT), int(Action.BET_THREE_QUARTER_POT),
+                            int(Action.BET_POT),
+                            int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
+                            int(Action.ALL_IN),
                             int(Action.OPEN_RAISE), int(Action.THREE_BET),
                             int(Action.FOUR_BET),
                             int(Action.DONK_SMALL), int(Action.DONK_MEDIUM)):
@@ -802,16 +843,22 @@ class CFRTrainer:
                 outstanding = 0.0
                 total_pot = inv[0] + inv[1]
 
-                if action == int(Action.BET_THIRD_POT):
+                if action == int(Action.BET_QUARTER_POT):
+                    bet = total_pot * 0.25
+                elif action == int(Action.BET_THIRD_POT):
                     bet = total_pot * 0.33
                 elif action == int(Action.BET_HALF_POT):
                     bet = total_pot * 0.5
                 elif action == int(Action.BET_TWO_THIRDS_POT):
                     bet = total_pot * 0.67
+                elif action == int(Action.BET_THREE_QUARTER_POT):
+                    bet = total_pot * 0.75
                 elif action == int(Action.BET_POT):
                     bet = total_pot
                 elif action == int(Action.BET_OVERBET):
                     bet = total_pot * 1.25
+                elif action == int(Action.BET_DOUBLE_POT):
+                    bet = total_pot * 2.0
                 elif action == int(Action.OPEN_RAISE):
                     bet = total_pot * 0.75  # ~2.5bb relative to blinds
                 elif action == int(Action.THREE_BET):
@@ -855,9 +902,12 @@ class CFRTrainer:
         )
         is_bet_call = (
             last_two[-1] == int(Action.CHECK_CALL) and
-            last_two[-2] in (int(Action.BET_THIRD_POT), int(Action.BET_HALF_POT),
-                             int(Action.BET_TWO_THIRDS_POT), int(Action.BET_POT),
-                             int(Action.BET_OVERBET), int(Action.ALL_IN),
+            last_two[-2] in (int(Action.BET_QUARTER_POT), int(Action.BET_THIRD_POT),
+                             int(Action.BET_HALF_POT),
+                             int(Action.BET_TWO_THIRDS_POT), int(Action.BET_THREE_QUARTER_POT),
+                             int(Action.BET_POT),
+                             int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
+                             int(Action.ALL_IN),
                              int(Action.OPEN_RAISE), int(Action.THREE_BET),
                              int(Action.FOUR_BET),
                              int(Action.DONK_SMALL), int(Action.DONK_MEDIUM))

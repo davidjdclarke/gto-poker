@@ -26,11 +26,14 @@ VISIT_CONFIDENCE_SLOPE = 2.0    # steepness of sigmoid
 
 # Bet size ratios for each abstract action (fraction of pot)
 ABSTRACT_BET_SIZES = {
+    int(Action.BET_QUARTER_POT): 0.25,
     int(Action.BET_THIRD_POT): 0.33,
     int(Action.BET_HALF_POT): 0.50,
     int(Action.BET_TWO_THIRDS_POT): 0.67,
+    int(Action.BET_THREE_QUARTER_POT): 0.75,
     int(Action.BET_POT): 1.00,
     int(Action.BET_OVERBET): 1.25,
+    int(Action.BET_DOUBLE_POT): 2.00,
     int(Action.DONK_SMALL): 0.25,
     int(Action.DONK_MEDIUM): 0.50,
     int(Action.ALL_IN): 3.00,  # approximate
