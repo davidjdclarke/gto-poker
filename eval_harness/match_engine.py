@@ -122,9 +122,15 @@ class GTOAgent(Agent):
         if key in self.trainer.nodes:
             node = self.trainer.nodes[key]
             avg_strategy = node.get_average_strategy()
-            strategy = {int(actions[i]): float(avg_strategy[i])
-                        for i in range(len(actions))}
-            self.lookup_hits += 1
+            if len(avg_strategy) == len(actions):
+                strategy = {int(actions[i]): float(avg_strategy[i])
+                            for i in range(len(actions))}
+                self.lookup_hits += 1
+            else:
+                # Action menu changed (abstraction expansion) — use uniform
+                uniform = 1.0 / len(actions)
+                strategy = {int(a): uniform for a in actions}
+                self.lookup_misses += 1
         else:
             uniform = 1.0 / len(actions)
             strategy = {int(a): uniform for a in actions}
