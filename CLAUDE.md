@@ -321,15 +321,15 @@ print(format_pain_map(analysis))
 
 ---
 
-## Current State (v9-B0, 100M iterations — 2026-03-14)
+## Current State (v9-B0, 100M iterations — 2026-03-15)
 
+**Best strategy: v9-B0 (13-action grid, 100M)** — `experiments/best/v9_B0_100M_allbots_positive.json`
 **Exploitability: 1.2211 bb/100** (3-seed eval harness)
 **Preflop exploitability:** 1.0204
-**Nodes:** 1,055,003 | **Strategy:** `server/gto/strategy.json` (old 13-action abstraction)
-**Experiment:** `experiments/v6_100.0M_20260313_195215_strategy.json`
-**Checkpoint log:** `checkpoints/checkpoint_log.json`
+**Nodes:** 1,055,003
+**Gauntlet average:** +677.2 bb/100 (all 7 bots positive)
 
-### Gauntlet Results (V9-B0 100M)
+### Gauntlet Results (V9-B0 100M — production strategy)
 
 | Bot | V9-B0 (100M) | v7 (67M) | Delta |
 |-----|-------------|----------|-------|
@@ -342,29 +342,34 @@ print(format_pain_map(analysis))
 | PerturbBot | **+696.7** | -366.0 | +1063 |
 | **Average** | **+677.2** | -226.2 | **+903** |
 
-All 7 bots now positive. Config: 2x phase schedule + old all-in dampening (rc<2, 0.7x).
+### v9 Experiment Results Summary
+
+**V9-B0 (13-action, 100M):** Exploitability 1.22, gauntlet +677. All 7 bots positive. Best strategy to date.
+
+**16-action grid (200M):** Exploitability **41.4** (did NOT converge). Gauntlet +318 — weaker than B0 despite 2x training. The 3 new bet sizes created ~2x more nodes (2.0M vs 1.05M) and exploitability plateaued at ~40 instead of converging. NitBot -1289, WeirdSizingBot +218 (no improvement over B0's +220). **Verdict: not viable at current iteration budgets.**
+
+**DCFR sweep (16-action, 20M):** Tested gamma = {0.999, 0.995}. Both showed exploitability *increasing* from 10M to 20M. DCFR destabilizes convergence on wider action trees. **Verdict: counterproductive for this grid.**
 
 ### What changed v7 → v9-B0
 - **Training config:** 2x phase schedule (was 3x), old all-in dampening, 100M iterations (was 67M)
-- **v9 infrastructure (code only, not yet trained):**
+- **v9 infrastructure added:**
   - Phase 0: EV decomposition, bridge pain map, checkpoint gauntlet
   - Phase 2: DCFR regret discounting, pluggable weight schedules
-  - Phase 3A: 3 new postflop bet sizes (BET_QUARTER_POT=13, BET_THREE_QUARTER_POT=14, BET_DOUBLE_POT=15)
-- **Note:** The v9-B0 strategy uses the OLD 13-action abstraction. Phase 3A code is ready but requires a full retrain with the new 16-action abstraction.
+  - Phase 3A: 16-action grid (code in place, but 13-action strategy is production)
 
 ### Known Issues
 
 | Issue | Severity | Description | Status |
 |-------|----------|-------------|--------|
-| WeirdSizingBot +220 | Medium | Positive but weakest matchup — Phase 3A grid expansion should help | Phase 3A code ready, needs retrain |
+| 16-action grid doesn't converge | High | Exploitability plateaus at ~40 even at 200M | Needs 500M+ or selective expansion |
+| WeirdSizingBot +220 | Medium | Positive but weakest matchup | 16-action grid didn't help; need translation improvements instead |
 | EQ0 river 100% bet | Medium | Specific EQ0 nodes still 100% bet on river | Structural abstraction limit |
-| Strategy on old abstraction | Info | Current strategy.json uses 13 actions, code now has 16 | Retrain needed after Phase 3A |
+| DCFR counterproductive | Info | Regret discounting destabilizes wider grids | Use standard CFR+ |
 | NitBot +718 | ~~Critical~~ **FIXED** | Was -409 at v7 67M | 2x schedule + old dampening |
 | CallStationBot +1071 | ~~Critical~~ **FIXED** | Was -437 at v7 67M | 2x schedule + old dampening |
 | PerturbBot +697 | ~~High~~ **FIXED** | Was -366 at v7 67M | 2x schedule + old dampening |
-| WeirdSizingBot -952 | ~~High~~ **FIXED** | Now +220 at v9-B0 | 2x schedule + old dampening |
 
-Full details: `docs/results/v9_B0_100M_20260314.md`
+Full details: `docs/results/v9_B0_100M_20260314.md`, `docs/results/v9_16action_200M_20260315.md`
 
 ---
 
@@ -375,7 +380,8 @@ Full details: `docs/results/v9_B0_100M_20260314.md`
 Each results doc should include: exploitability, gauntlet table, bridge mapping A/B, off-tree stress test, strategy audit, and a comparison to the previous iteration. This creates a historical record of how the strategy evolves over time.
 
 Existing results:
-- `docs/results/v9_B0_100M_20260314.md` — v9-B0 baseline at 100M iterations (current)
+- `docs/results/v9_16action_200M_20260315.md` — 16-action grid experiment (negative result)
+- `docs/results/v9_B0_100M_20260314.md` — v9-B0 baseline at 100M iterations (best strategy)
 - `docs/results/v7_67M_20260313.md` — v7 at 67M iterations
 
 ## Action Plans

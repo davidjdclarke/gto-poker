@@ -615,5 +615,89 @@
       "frequency_anomalies": 17311
     },
     "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260313_195215_strategy.json"
+  },
+  {
+    "name": "v6_20.0M_20260314_203525",
+    "timestamp": "2026-03-14T20:35:42",
+    "config": {
+      "iterations": 20000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1974918,
+      "train_time_s": 2159.3,
+      "ms_per_iteration": 0.11,
+      "exploitability_mean": 8.5358,
+      "exploitability_std": 0.2182,
+      "exploitability_preflop": 1.8027
+    },
+    "audit_counts": {
+      "premium_limp": 6,
+      "allin_overuse": 964,
+      "flat_strategies": 2758,
+      "frequency_anomalies": 27694
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_20.0M_20260314_203525_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260314_235625",
+    "timestamp": "2026-03-14T23:56:40",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1998261,
+      "train_time_s": 8908.6,
+      "ms_per_iteration": 0.09,
+      "exploitability_mean": 40.8493,
+      "exploitability_std": 2.6566,
+      "exploitability_preflop": 1.0087
+    },
+    "audit_counts": {
+      "premium_limp": 3,
+      "allin_overuse": 747,
+      "flat_strategies": 1419,
+      "frequency_anomalies": 3421
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260314_235625_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260315_103942",
+    "timestamp": "2026-03-15T10:40:00",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1999902,
+      "train_time_s": 36645.6,
+      "ms_per_iteration": 0.37,
+      "exploitability_mean": 41.4081,
+      "exploitability_std": 1.6884,
+      "exploitability_preflop": 1.0162
+    },
+    "audit_counts": {
+      "premium_limp": 3,
+      "allin_overuse": 793,
+      "flat_strategies": 1544,
+      "frequency_anomalies": 2643
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260315_103942_strategy.json"
   }
 ]

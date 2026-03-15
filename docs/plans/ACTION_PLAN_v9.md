@@ -168,11 +168,11 @@ Chosen based on WeirdSizingBot gaps (0.15→bet_third, 0.75→bet_pot, 2.0→all
 |-----|--------|-----------|------------|--------|
 | 0 | Phase 0 (measurement code) | n/a | none | **DONE** |
 | 1 | V9-B0 (2x + old damp) | 100M + ckpts | Phase 0C | **DONE** — +677 avg, expl 1.22 |
-| 2 | V9-S1 DCFR sweep | 3x 20M | Phase 1 | pending |
-| 3 | V9-S1/S2 best at 100M | 100M | Run 2 | pending |
-| 4 | V9-A1 action grid expand | 100M | Phase 0B, Run 3 | **CODE DONE** — needs retrain |
-| 5 | V9-A2/A3 translation | eval only | Run 4 | pending |
-| 6 | V9-C1 9-bucket parity | 115M | Run 3 | pending |
+| 2 | V9-S1 DCFR sweep | 2x 20M | Phase 1 | **DONE** — NEGATIVE (diverges) |
+| 3 | V9-S1/S2 best at 100M | 100M | Run 2 | **SKIPPED** — DCFR not viable |
+| 4 | V9-A1 action grid expand | 200M | Phase 0B | **DONE** — NEGATIVE (expl 41, gauntlet +318) |
+| 5 | V9-A2/A3 translation | eval only | Run 4 | **SKIPPED** — grid didn't converge |
+| 6 | V9-C1 9-bucket parity | 115M | Run 3 | not started |
 
 ---
 
@@ -185,7 +185,13 @@ All measurement tools (EV decomposition, bridge pain map, checkpoint gauntlet) a
 100M iterations, 2x schedule + old dampening. Exploitability 1.2211, gauntlet avg +677.2 bb/100 (all 7 bots positive). Massive improvement from v7's -226.2. See `docs/results/v9_B0_100M_20260314.md`.
 
 ### 2026-03-14: Phase 3A action grid expansion (Run 4 code)
-Added 3 new postflop bet sizes: BET_QUARTER_POT (0.25x), BET_THREE_QUARTER_POT (0.75x), BET_DOUBLE_POT (2.0x). Updated all 12 files. NodeData expanded from [13] to [16]. Cython rebuilt, all 16 Kuhn tests pass. Requires full retrain to use.
+Added 3 new postflop bet sizes: BET_QUARTER_POT (0.25x), BET_THREE_QUARTER_POT (0.75x), BET_DOUBLE_POT (2.0x). Updated all 12 files. NodeData expanded from [13] to [16]. Cython rebuilt, all 16 Kuhn tests pass.
+
+### 2026-03-15: DCFR sweep (Run 2) — NEGATIVE
+Tested gamma = {0.999, 0.995} at 20M on 16-action grid. Both showed exploitability *increasing* from 10M to 20M. DCFR destabilizes convergence on wider action trees. Abandoned gamma=0.99 and skipped Run 3.
+
+### 2026-03-15: 16-action grid 200M (Run 4) — NEGATIVE
+Trained 200M iterations (100M fresh + 100M continued). Exploitability plateaued at ~40 bb/100 (vs B0's 1.22). Gauntlet +318 (vs B0's +677). NitBot -1289 (vs B0's +719), WeirdSizingBot +218 (no improvement over B0's +220). The 2x node explosion (2.0M vs 1.05M) causes a convergence problem that can't be solved with proportionally more iterations. See `docs/results/v9_16action_200M_20260315.md`.
 
 ---
 
@@ -195,8 +201,8 @@ v9 is successful if ALL of:
 1. **Gauntlet avg > +50 bb/100** (from -44.3) — **PASS: +677.2**
 2. **CallStation loss decomposed** and thin-value metric improved (not just bluff ratio) — **PASS: +1071.4** (was -437)
 3. **WeirdSizing > -400 bb/100** (from -952) — **PASS: +220.4**
-4. **One solver-dynamics variant beats fixed CFR+** (DCFR or schedule) — pending (Run 2)
-5. **One abstraction variant tested at fair convergence parity** — pending (Run 4/6)
+4. **One solver-dynamics variant beats fixed CFR+** (DCFR or schedule) — **FAIL: DCFR counterproductive**
+5. **One abstraction variant tested at fair convergence parity** — **FAIL: 16-action grid did not converge at 200M**
 
 ---
 
