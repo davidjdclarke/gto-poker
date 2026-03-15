@@ -566,6 +566,7 @@ def main():
     checkpoint_dir = 'checkpoints'
     checkpoint_eval = '--checkpoint-eval' in flags
     checkpoint_gauntlet = '--checkpoint-gauntlet' in flags
+    gauntlet_interval = 0  # 0 = run at every checkpoint (default)
     regret_discount = 1.0    # 1.0=CFR+, <1.0=DCFR
     weight_schedule_mode = 0  # 0=linear, 1=exponential, 2=polynomial
     weight_schedule_param = 1.0
@@ -599,6 +600,9 @@ def main():
             skip_indices.add(i + 1)
         elif flag == '--weight-param' and i < len(sys.argv) - 1:
             weight_schedule_param = float(sys.argv[i + 1])
+            skip_indices.add(i + 1)
+        elif flag == '--gauntlet-interval' and i < len(sys.argv) - 1:
+            gauntlet_interval = int(sys.argv[i + 1])
             skip_indices.add(i + 1)
     if num_workers < 1:
         num_workers = 1
@@ -714,7 +718,11 @@ def main():
                       f"nodes={len(trainer.nodes):,}")
 
             # Optional: run quick gauntlet at checkpoint
-            if checkpoint_gauntlet:
+            # gauntlet_interval controls how often (0 = every checkpoint)
+            run_gauntlet = checkpoint_gauntlet
+            if run_gauntlet and gauntlet_interval > 0:
+                run_gauntlet = (total_iters % gauntlet_interval == 0)
+            if run_gauntlet:
                 try:
                     gauntlet = _run_checkpoint_gauntlet(trainer, hands=500)
                     entry['gauntlet'] = gauntlet
