@@ -227,12 +227,39 @@ V9 added significant tooling that will benefit future iterations:
 
 ---
 
-## Recommendations for v10
+## Deferred to v10
+
+The following v9 plan items were not started. They remain viable and are recommended as v10 priorities since they don't require retraining the CFR strategy.
+
+### Phase 3B: Confidence-Aware Nearest Mapping
+**Goal:** Improve WeirdSizingBot by fixing the translation layer, not the action grid.
+
+When the GTO agent faces an off-tree bet (e.g. 0.75x pot, which maps to `bet_pot`), the mapped action may be far from the actual size. Phase 3B blends the trained strategy with an equity heuristic proportional to the mapping distance:
+- Small distance (< 0.2 pot-fractions): use trained strategy as-is
+- Large distance: blend up to 15% toward equity heuristic
+
+**Scope:** Modify `GTOAgent.decide()` in `match_engine.py` for `nearest` mapping. No retraining needed — works with B0 strategy. Use the bridge pain map (`eval_harness/bridge_pain.py`) to identify the worst translation gaps and validate improvement.
+
+### Phase 3C: Local Refinement Prototype
+**Goal:** Mini-CFR resolve for specific off-tree spots (river/turn facing overbet).
+
+When facing a bet size that doesn't exist in the abstract tree, run a small 1000-iteration CFR solve on the immediate subtree using the actual bet size. This produces a locally-optimal response rather than relying on the nearest mapped action.
+
+**Scope:** New file `server/gto/local_refine.py`. Only invoked for `mapping="resolve"` on river/turn facing overbet-sized bets. Should beat `nearest` on WeirdSizingBot by >100 bb/100.
+
+### Phase 4: 9 Equity Buckets at Convergence Parity
+**Goal:** Test whether finer equity resolution improves strategy quality.
+
+Increase from 8 to 9 equity buckets (135 total buckets, +12.5% nodes). Train to 115M iterations for per-node convergence parity with B0. This is a much safer expansion than the 16-action grid (+12% nodes vs +90%).
+
+**Scope:** Parameterize `NUM_EQUITY_BUCKETS` in `abstraction.py` and `cfr_fast.pyx` (Phase 4A code already specced in ACTION_PLAN_v9.md). Full retrain required.
+
+### Additional v10 Recommendations
 
 1. **Ship B0 as production.** Exploitability 1.22, all bots positive, robust.
-2. **For WeirdSizingBot improvement:** Pursue translation-layer improvements (Phase 3B confidence-aware mapping, Phase 3C local refinement) rather than expanding the action grid.
-3. **For abstraction improvement:** Test 9 equity buckets at convergence parity (Phase 4) — this adds ~12% more nodes vs the 90% more from action expansion.
-4. **If revisiting action expansion:** Try adding only BET_THREE_QUARTER_POT (the single largest translation gap) on river-only, keeping node growth under 20%.
+2. **Prioritize 3B/3C over 4.** Translation-layer improvements require no retraining and directly target the weakest matchup (WeirdSizingBot +220).
+3. **If revisiting action expansion:** Try adding only BET_THREE_QUARTER_POT (the single largest translation gap) on river-only, keeping node growth under 20%.
+4. **Weight schedule experiments:** The exponential/polynomial weight schedules (Phase 2B) were implemented but never tested independently on the 13-action grid. Low-cost experiment — just training runs with different `--weight-schedule` flags.
 
 ## Files
 
