@@ -380,8 +380,9 @@ Full details: `docs/results/v9_B0_100M_20260314.md`, `docs/results/v9_16action_2
 Each results doc should include: exploitability, gauntlet table, bridge mapping A/B, off-tree stress test, strategy audit, and a comparison to the previous iteration. This creates a historical record of how the strategy evolves over time.
 
 Existing results:
-- `docs/results/v9_16action_200M_20260315.md` — 16-action grid experiment (negative result)
-- `docs/results/v9_B0_100M_20260314.md` — v9-B0 baseline at 100M iterations (best strategy)
+- `docs/results/v9_complete_report.md` — v9 definitive report: B0 baseline, DCFR sweep, 16-action grid
+- `docs/results/v9_B0_100M_20260314.md` — v9-B0 baseline detail
+- `docs/results/v9_16action_200M_20260315.md` — 16-action grid experiment detail
 - `docs/results/v7_67M_20260313.md` — v7 at 67M iterations
 
 ## Action Plans
