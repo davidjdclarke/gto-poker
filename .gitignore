@@ -20,8 +20,15 @@ strategy_*.json
 # Backup strategy files
 *.bak
 
+# Checkpoint strategy files (160-170MB each)
+checkpoints/ckpt_*.json
+
+# DCFR sweep strategy files
+dcfr_sweep/strategy_*.json
+
 # Cython generated
 server/gto/cfr_fast.c
+eval_harness/eval_fast.c
 
 # IDE
 .vscode/

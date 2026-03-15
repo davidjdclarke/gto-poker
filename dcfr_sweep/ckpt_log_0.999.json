@@ -1,0 +1,36 @@
+[
+  {
+    "iterations": 10000000,
+    "nodes": 1962559,
+    "timestamp": "20260314_200047",
+    "file": "checkpoints/ckpt_10000000.json",
+    "exploitability": 4.3675,
+    "gauntlet": {
+      "NitBot": -538.6,
+      "AggroBot": 1483.0,
+      "OverfoldBot": -49.2,
+      "CallStationBot": 2549.1,
+      "DonkBot": 594.8,
+      "WeirdSizingBot": -60.6,
+      "PerturbBot": 572.1,
+      "avg_bb_per_100": 650.1
+    }
+  },
+  {
+    "iterations": 20000000,
+    "nodes": 1974918,
+    "timestamp": "20260314_202112",
+    "file": "checkpoints/ckpt_20000000.json",
+    "exploitability": 8.6017,
+    "gauntlet": {
+      "NitBot": -487.3,
+      "AggroBot": 293.9,
+      "OverfoldBot": -650.9,
+      "CallStationBot": 1007.8,
+      "DonkBot": 817.4,
+      "WeirdSizingBot": -1740.5,
+      "PerturbBot": 319.4,
+      "avg_bb_per_100": -62.9
+    }
+  }
+]
