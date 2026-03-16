@@ -29,7 +29,8 @@ venv/bin/python -m pytest tests/
 ```
 poker/
 ├── train_gto.py               # Training CLI (tqdm + parallel workers)
-├── run_eval_harness.py        # Full eval suite (4 test suites)
+├── run_eval_harness.py        # Full eval suite (4 test suites + multi-seed gauntlet)
+├── run_phase0_validation.py   # V10 Phase 0: validation, diagnostics, cliff analysis
 ├── run_experiment.py          # Experiment tracking & comparison
 ├── simulate.py                # Self-play simulation (GTO vs heuristic bots)
 ├── setup_cython.py            # Cython build (-O3 -march=native)
@@ -321,34 +322,49 @@ print(format_pain_map(analysis))
 
 ---
 
-## Current State (v9-B0, 100M iterations — 2026-03-15)
+## Current State (v10, 2026-03-15)
 
 **Best strategy: v9-B0 (13-action grid, 100M)** — `experiments/best/v9_B0_100M_allbots_positive.json`
+**Best mapping: `confidence_nearest`** (v10 improvement, no retrain)
 **Exploitability: 1.2211 bb/100** (3-seed eval harness)
 **Preflop exploitability:** 1.0204
 **Nodes:** 1,055,003
-**Gauntlet average:** +677.2 bb/100 (all 7 bots positive)
+**Gauntlet average (nearest):** +28.5 bb/100 (corrected from +677 — see v10 Phase 0 report)
+**Gauntlet average (confidence_nearest):** +225.1 bb/100 (v10 Phase 3 improvement)
 
-### Gauntlet Results (V9-B0 100M — production strategy)
+### Gauntlet Results (V10-corrected, 5k hands, 3 seeds)
 
-| Bot | V9-B0 (100M) | v7 (67M) | Delta |
-|-----|-------------|----------|-------|
-| NitBot | **+718.5** | -409.3 | +1128 |
-| AggroBot | **+893.4** | +179.4 | +714 |
-| OverfoldBot | **+115.9** | +107.8 | +8 |
-| CallStationBot | **+1071.4** | -437.0 | +1508 |
-| DonkBot | **+1024.0** | +293.9 | +730 |
-| WeirdSizingBot | **+220.4** | -952.4 | +1173 |
-| PerturbBot | **+696.7** | -366.0 | +1063 |
-| **Average** | **+677.2** | -226.2 | **+903** |
+| Bot | nearest | confidence_nearest | Delta |
+|-----|---------|-------------------|-------|
+| NitBot | +119.9 | **+200.3** | +80 |
+| AggroBot | +339.9 | **+444.0** | +104 |
+| OverfoldBot | +6.7 | -3.9 | -11 |
+| CallStationBot | +72.5 | **+73.0** | +1 |
+| DonkBot | +409.6 | **+717.6** | +308 |
+| WeirdSizingBot | -770.9 | **-202.8** | **+568** |
+| PerturbBot | +22.1 | **+347.2** | +325 |
+| **Average** | **+28.5** | **+225.1** | **+197** |
 
-### v9 Experiment Results Summary
+> **Note:** Prior v9 published results (+677 avg) were inflated by 500-hand sample noise and a 16-action grid compatibility bug. See `docs/results/v10_phase0_report.md` for full analysis.
 
-**V9-B0 (13-action, 100M):** Exploitability 1.22, gauntlet +677. All 7 bots positive. Best strategy to date.
+### v10 Experiment Results Summary
+
+**V10 Phase 0:** Corrected B0 baseline to +28.5 bb/100 (nearest). Found and fixed 16-action grid bug and OpponentProfile regression.
+
+**V10 Phase 3:** `confidence_nearest` mapping improved average to +225.1 bb/100 without retraining. WeirdSizingBot improved +568 bb/100.
+
+**V9-B0 (13-action, 100M):** Exploitability 1.22, corrected gauntlet +28.5 (nearest) / +225.1 (confidence_nearest).
 
 **16-action grid (200M):** Exploitability **41.4** (did NOT converge). Gauntlet +318 — weaker than B0 despite 2x training. The 3 new bet sizes created ~2x more nodes (2.0M vs 1.05M) and exploitability plateaued at ~40 instead of converging. NitBot -1289, WeirdSizingBot +218 (no improvement over B0's +220). **Verdict: not viable at current iteration budgets.**
 
 **DCFR sweep (16-action, 20M):** Tested gamma = {0.999, 0.995}. Both showed exploitability *increasing* from 10M to 20M. DCFR destabilizes convergence on wider action trees. **Verdict: counterproductive for this grid.**
+
+### What changed v9 → v10
+- **Bugs fixed:** 16-action grid compatibility bug, OpponentProfile regression
+- **New mapping:** `confidence_nearest` (+225.1 avg vs +28.5 for `nearest`)
+- **Tooling:** Multi-seed gauntlet with CIs, Phase 0 validation script, grid auto-detection
+- **Evaluation corrected:** Published +677 avg corrected to +28.5 (nearest) / +225.1 (confidence_nearest)
+- **Phase 2 in progress:** Exponential weight schedule training at 100M iterations
 
 ### What changed v7 → v9-B0
 - **Training config:** 2x phase schedule (was 3x), old all-in dampening, 100M iterations (was 67M)
@@ -361,15 +377,15 @@ print(format_pain_map(analysis))
 
 | Issue | Severity | Description | Status |
 |-------|----------|-------------|--------|
-| 16-action grid doesn't converge | High | Exploitability plateaus at ~40 even at 200M | Needs 500M+ or selective expansion |
-| WeirdSizingBot +220 | Medium | Positive but weakest matchup | 16-action grid didn't help; need translation improvements instead |
-| EQ0 river 100% bet | Medium | Specific EQ0 nodes still 100% bet on river | Structural abstraction limit |
-| DCFR counterproductive | Info | Regret discounting destabilizes wider grids | Use standard CFR+ |
-| NitBot +718 | ~~Critical~~ **FIXED** | Was -409 at v7 67M | 2x schedule + old dampening |
-| CallStationBot +1071 | ~~Critical~~ **FIXED** | Was -437 at v7 67M | 2x schedule + old dampening |
-| PerturbBot +697 | ~~High~~ **FIXED** | Was -366 at v7 67M | 2x schedule + old dampening |
+| WeirdSizingBot -203 | Medium | Still weakest matchup even with confidence_nearest | Need local refinement (V10-B2) |
+| 16-action grid 15% coverage | High | Only 15% of nodes well-visited at 200M | Needs Cython grid config or selective expansion |
+| OpponentProfile counterproductive | Medium | Hurts performance, especially vs CallStation | Disabled; needs redesign |
+| EQ0 river 100% bet | Low | Specific EQ0 nodes still 100% bet on river | Structural abstraction limit |
+| Cython hardcodes 16-action | Medium | Can't train 13-action grid with Cython | Need configurable action grid in Cython |
+| 16-action grid bug | ~~Critical~~ **FIXED** | `_postflop_actions()` broke 13-action B0 eval | Grid auto-detection added (v10) |
+| Published v9 results inflated | ~~Critical~~ **FIXED** | +677 avg was from 500-hand noise + grid bug | Corrected to +28.5 nearest / +225 conf_nearest |
 
-Full details: `docs/results/v9_B0_100M_20260314.md`, `docs/results/v9_16action_200M_20260315.md`
+Full details: `docs/results/v10_complete_report.md`, `docs/results/v10_phase0_report.md`
 
 ---
 
@@ -380,8 +396,10 @@ Full details: `docs/results/v9_B0_100M_20260314.md`, `docs/results/v9_16action_2
 Each results doc should include: exploitability, gauntlet table, bridge mapping A/B, off-tree stress test, strategy audit, and a comparison to the previous iteration. This creates a historical record of how the strategy evolves over time.
 
 Existing results:
+- `docs/results/v10_complete_report.md` — **v10 definitive report**: corrected baseline, confidence mapping, full analysis
+- `docs/results/v10_phase0_report.md` — v10 Phase 0: bugs found, corrected gauntlet, cliff analysis
 - `docs/results/v9_complete_report.md` — v9 definitive report: B0 baseline, DCFR sweep, 16-action grid
-- `docs/results/v9_B0_100M_20260314.md` — v9-B0 baseline detail
+- `docs/results/v9_B0_100M_20260314.md` — v9-B0 baseline detail (results now known to be inflated)
 - `docs/results/v9_16action_200M_20260315.md` — 16-action grid experiment detail
 - `docs/results/v7_67M_20260313.md` — v7 at 67M iterations
 
@@ -390,13 +408,37 @@ Existing results:
 **Before starting a new improvement cycle, create an action plan in `docs/plans/`** describing the goals, hypotheses, and planned changes. Update the plan as work progresses. This provides a decision log for why changes were made.
 
 Existing plans:
-- `docs/plans/ACTION_PLAN_v9.md` — v9 improvement plan (current)
+- `docs/plans/ACTION_PLAN_v10.md` — v10 research plan (current)
+- `docs/plans/ACTION_PLAN_v9.md` — v9 improvement plan
 - `docs/plans/ACTION_PLAN_v8_ablations.md` — v8 ablation study plan
 - `docs/plans/ACTION_PLAN_v7.md` — v7 improvement plan
 
 ---
 
 ## Common Tasks
+
+### Run V10 Phase 0 Validation
+
+```bash
+# Full validation (5k hands, 3 seeds — ~15 min)
+venv/bin/python run_phase0_validation.py all --hands 5000
+
+# Quick smoke test (200 hands, 2 seeds)
+venv/bin/python run_phase0_validation.py validate --quick
+
+# Causal diagnostics only (B0 vs v7)
+venv/bin/python run_phase0_validation.py diagnose --bots CallStationBot
+
+# Checkpoint cliff analysis
+venv/bin/python run_phase0_validation.py cliff
+```
+
+### Run Multi-Seed Gauntlet
+
+```bash
+# Multi-seed gauntlet with confidence intervals
+venv/bin/python run_eval_harness.py --gauntlet --hands 5000 --seeds 42,123,456
+```
 
 ### Add a New Bot to Eval Harness
 
@@ -460,4 +502,10 @@ strategy = trainer.get_strategy('preflop', 0, (Action.OPEN_RAISE,), 'ip')
 
 6. **Postflop pot = 1.0 normalized**: All bet sizings in the solver are fractions of the normalized pot. The engine translates to real chips. `inv = [0.5, 0.5]` means each player has contributed 0.5 to a pot of 1.0.
 
-7. **`nearest` is the default mapping**: GTOAgent default is `"nearest"`. The `conservative` mapping (15% bleed from bet actions → CHECK_CALL) was default in v6 to compensate for river over-bluffing. With the river bluff ratio now healthy (35.1%), conservative hurts value betting — nearest is +276.9 vs conservative -33.5 avg.
+7. **`confidence_nearest` is the recommended mapping**: GTOAgent default is `"nearest"` but `"confidence_nearest"` (+225.1 avg) outperforms it (+28.5 avg) by blending with equity heuristic when facing off-tree bets. Use `confidence_nearest` for all evaluation.
+
+8. **Action grid auto-detection is required**: When loading a strategy, call `detect_action_grid_from_strategy()` and `set_action_grid()`. The B0 strategy uses a 13-action grid; the Cython trainer creates 16-action nodes. Mismatched grids cause ~45% lookup failures. `get_trainer()` in engine.py handles this automatically.
+
+9. **OpponentProfile is disabled for evaluation**: The `OpponentProfile` model was found counterproductive (v10 Phase 0). Use `--no-opponent-model` flag or pass `opponent_profile=None` to GTOAgent for accurate results. The OP model needs redesign before it's useful.
+
+10. **Cython action grid is independent**: `cfr_fast.pyx` has its own hardcoded action menus, separate from `abstraction.py`'s `get_available_actions()`. Changing the Python grid doesn't affect training. Need Cython rebuild for training grid changes.

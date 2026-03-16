@@ -1,0 +1,185 @@
+{
+  "gauntlet": {
+    "per_bot": {
+      "NitBot": {
+        "mean": -2668.86,
+        "std": 241.12,
+        "ci_95": 272.86,
+        "ci_low": -2941.72,
+        "ci_high": -2396.01,
+        "per_seed": {
+          "42": -2426.34,
+          "123": -2671.69,
+          "456": -2908.56
+        },
+        "num_hands_per_seed": 5000
+      },
+      "AggroBot": {
+        "mean": 500.74,
+        "std": 41.43,
+        "ci_95": 46.88,
+        "ci_low": 453.86,
+        "ci_high": 547.62,
+        "per_seed": {
+          "42": 473.61,
+          "123": 548.43,
+          "456": 480.18
+        },
+        "num_hands_per_seed": 5000
+      },
+      "OverfoldBot": {
+        "mean": 11.2,
+        "std": 11.06,
+        "ci_95": 12.51,
+        "ci_low": -1.31,
+        "ci_high": 23.72,
+        "per_seed": {
+          "42": 0.46,
+          "123": 10.6,
+          "456": 22.55
+        },
+        "num_hands_per_seed": 5000
+      },
+      "CallStationBot": {
+        "mean": -1384.38,
+        "std": 281.24,
+        "ci_95": 318.25,
+        "ci_low": -1702.63,
+        "ci_high": -1066.13,
+        "per_seed": {
+          "42": -1454.18,
+          "123": -1624.14,
+          "456": -1074.81
+        },
+        "num_hands_per_seed": 5000
+      },
+      "DonkBot": {
+        "mean": -770.75,
+        "std": 349.85,
+        "ci_95": 395.89,
+        "ci_low": -1166.64,
+        "ci_high": -374.85,
+        "per_seed": {
+          "42": -494.25,
+          "123": -1164.06,
+          "456": -653.93
+        },
+        "num_hands_per_seed": 5000
+      },
+      "WeirdSizingBot": {
+        "mean": -2104.36,
+        "std": 212.43,
+        "ci_95": 240.38,
+        "ci_low": -2344.74,
+        "ci_high": -1863.98,
+        "per_seed": {
+          "42": -2184.16,
+          "123": -2265.33,
+          "456": -1863.59
+        },
+        "num_hands_per_seed": 5000
+      },
+      "PerturbBot": {
+        "mean": 0.4,
+        "std": 403.79,
+        "ci_95": 456.93,
+        "ci_low": -456.53,
+        "ci_high": 457.33,
+        "per_seed": {
+          "42": -303.7,
+          "123": 458.54,
+          "456": -153.64
+        },
+        "num_hands_per_seed": 5000
+      }
+    },
+    "summary": {
+      "avg_mean": -916.57,
+      "best_bot": "AggroBot",
+      "worst_bot": "NitBot",
+      "num_hands_per_seed": 5000,
+      "seeds": [
+        42,
+        123,
+        456
+      ],
+      "num_seeds": 3
+    }
+  },
+  "exploitability_standard": {
+    "mean": 107.8909,
+    "std": 2.9767,
+    "ci_95_low": 104.5224,
+    "ci_95_high": 111.2593,
+    "cv_pct": 2.76,
+    "num_seeds": 3,
+    "samples_per_seed": 500,
+    "values": [
+      111.2357,
+      106.9036,
+      105.5332
+    ],
+    "per_phase": {
+      "preflop": {
+        "mean": 0.9943,
+        "std": 0.0121
+      },
+      "flop": {
+        "mean": 144.1187,
+        "std": 5.8945
+      },
+      "turn": {
+        "mean": 147.0748,
+        "std": 5.8585
+      },
+      "river": {
+        "mean": 134.3547,
+        "std": 5.8993
+      }
+    }
+  },
+  "exploitability_hifi": {
+    "mean": 107.66,
+    "std": 3.4182,
+    "ci_95_low": 104.6638,
+    "ci_95_high": 110.6562,
+    "cv_pct": 3.18,
+    "num_seeds": 5,
+    "samples_per_seed": 1000,
+    "values": [
+      112.8971,
+      107.3779,
+      104.88,
+      104.4352,
+      108.7099
+    ],
+    "per_phase": {
+      "preflop": {
+        "mean": 1.0001,
+        "std": 0.0231
+      },
+      "flop": {
+        "mean": 144.4792,
+        "std": 3.0426
+      },
+      "turn": {
+        "mean": 145.5579,
+        "std": 1.2847
+      },
+      "river": {
+        "mean": 132.6486,
+        "std": 2.8411
+      }
+    }
+  },
+  "config": {
+    "strategy": "experiments/best/v9_B0_100M_allbots_positive.json",
+    "hands_per_seed": 5000,
+    "seeds": [
+      42,
+      123,
+      456
+    ],
+    "big_blind": 20
+  }
+}

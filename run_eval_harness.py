@@ -21,6 +21,7 @@ Usage:
 """
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -28,6 +29,7 @@ from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
+import numpy as np
 from tqdm import tqdm
 
 from server.gto.engine import get_trainer
@@ -43,6 +45,9 @@ from server.gto.exploitability import (
 )
 
 
+_USE_OPPONENT_MODEL = True  # Module-level flag, overridden by --no-opponent-model
+
+
 def _play_one_matchup(opp_index: int, num_hands: int, seed: int,
                       big_blind: int) -> dict:
     """Worker function for parallel gauntlet. Loads trainer in-process."""
@@ -53,8 +58,9 @@ def _play_one_matchup(opp_index: int, num_hands: int, seed: int,
     trainer = get_trainer()
     build_preflop_cache(simulations=200)
 
+    opp_profile = OpponentProfile() if _USE_OPPONENT_MODEL else None
     gto = GTOAgent(trainer, name="GTO", simulations=80,
-                   opponent_profile=OpponentProfile())
+                   opponent_profile=opp_profile)
     adversaries = get_all_adversaries(trainer)
     opp = adversaries[opp_index]
 
@@ -182,6 +188,106 @@ def run_gauntlet(trainer: CFRTrainer, num_hands: int, seed: int,
         "strategy_hit_rate": round(hit_rate, 1),
     }
     return results
+
+
+def run_gauntlet_multiseed(trainer: CFRTrainer, num_hands: int,
+                           seeds: list[int], big_blind: int,
+                           parallel: bool = True) -> dict:
+    """Run gauntlet across multiple seeds and compute per-bot statistics.
+
+    Returns dict with per-bot mean/std/CI and per-seed raw values.
+    """
+    from eval_harness.adversaries import get_all_adversaries
+
+    print("\n" + "=" * 60)
+    print("  MULTI-SEED OPPONENT GAUNTLET")
+    print("=" * 60)
+    print(f"  {num_hands} hands/bot x {len(seeds)} seeds = "
+          f"{num_hands * len(seeds)} total hands/bot")
+
+    adversaries = get_all_adversaries(trainer)
+    num_opps = len(adversaries)
+    opp_names = [a.name for a in adversaries]
+
+    # Build all (opp_index, seed) tasks
+    tasks = [(i, s) for s in seeds for i in range(num_opps)]
+    total_tasks = len(tasks)
+
+    # Collect raw results: {opp_name: {seed: matchup_result}}
+    raw = defaultdict(dict)
+
+    if parallel and total_tasks > 1:
+        workers = min(total_tasks, os.cpu_count() or 4)
+        print(f"  Running {total_tasks} matchups across {workers} workers...")
+        t0_all = time.time()
+
+        with ProcessPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(_play_one_matchup, opp_i, num_hands, seed, big_blind): (opp_i, seed)
+                for opp_i, seed in tasks
+            }
+            pbar = tqdm(as_completed(futures), total=total_tasks,
+                        desc="  Gauntlet", unit="matchup", leave=True)
+            for future in pbar:
+                r = future.result()
+                name = r["opp_name"]
+                _, seed_val = futures[future]
+                raw[name][seed_val] = r
+                pbar.set_postfix_str(f"vs {name} seed={seed_val} {r['bb_per_100']:+.1f}")
+
+        print(f"  Wall time: {time.time() - t0_all:.1f}s")
+    else:
+        for opp_i, seed_val in tqdm(tasks, desc="  Gauntlet", unit="matchup"):
+            r = _play_one_matchup(opp_i, num_hands, seed_val, big_blind)
+            raw[r["opp_name"]][seed_val] = r
+
+    # Compute per-bot statistics
+    n_seeds = len(seeds)
+    per_bot = {}
+    for name in opp_names:
+        bb_values = [raw[name][s]["bb_per_100"] for s in seeds if s in raw[name]]
+        arr = np.array(bb_values)
+        mean = float(arr.mean())
+        std = float(arr.std(ddof=1)) if len(arr) > 1 else 0.0
+        ci = 1.96 * std / math.sqrt(len(arr)) if len(arr) > 1 else 0.0
+        per_bot[name] = {
+            "mean": round(mean, 2),
+            "std": round(std, 2),
+            "ci_95": round(ci, 2),
+            "ci_low": round(mean - ci, 2),
+            "ci_high": round(mean + ci, 2),
+            "per_seed": {s: raw[name][s]["bb_per_100"] for s in seeds if s in raw[name]},
+            "num_hands_per_seed": num_hands,
+        }
+
+    # Summary
+    avg_mean = np.mean([b["mean"] for b in per_bot.values()])
+    worst = min(per_bot.items(), key=lambda x: x[1]["mean"])
+    best = max(per_bot.items(), key=lambda x: x[1]["mean"])
+
+    print(f"\n  {'Bot':<20} {'Mean':>8} {'Std':>8} {'95% CI':>16}")
+    print(f"  {'-'*20} {'-'*8} {'-'*8} {'-'*16}")
+    for name in opp_names:
+        b = per_bot[name]
+        status = "OK" if b["mean"] > -5 else "WARN" if b["mean"] > -15 else "FAIL"
+        print(f"  [{status:>4}] {name:<15} {b['mean']:>+8.1f} {b['std']:>8.1f} "
+              f"[{b['ci_low']:>+7.1f}, {b['ci_high']:>+7.1f}]")
+
+    print(f"\n  Average: {avg_mean:+.1f} bb/100")
+    print(f"  Best:  {best[0]:<20} {best[1]['mean']:+.1f}")
+    print(f"  Worst: {worst[0]:<20} {worst[1]['mean']:+.1f}")
+
+    return {
+        "per_bot": per_bot,
+        "summary": {
+            "avg_mean": round(float(avg_mean), 2),
+            "best_bot": best[0],
+            "worst_bot": worst[0],
+            "num_hands_per_seed": num_hands,
+            "seeds": seeds,
+            "num_seeds": n_seeds,
+        },
+    }
 
 
 def run_offtree(trainer: CFRTrainer, num_hands: int, seed: int,
@@ -408,14 +514,23 @@ def main():
     parser.add_argument("--hands", type=int, default=2000, help="Hands per matchup (default 2000)")
     parser.add_argument("--quick", action="store_true", help="Quick check (100 hands)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--seeds", type=str, default=None,
+                        help="Comma-separated seeds for multi-seed gauntlet (e.g. 42,123,456)")
     parser.add_argument("--bb", type=int, default=20, help="Big blind size")
     parser.add_argument("--save", type=str, default=None, help="Save results to JSON file")
     parser.add_argument("--no-parallel", action="store_true", help="Disable parallel gauntlet")
+    parser.add_argument("--no-opponent-model", action="store_true",
+                        help="Disable opponent model adjustments (pure GTO eval)")
     parser.add_argument("--strategy", type=str, default=None, help="Path to strategy JSON file (default: server/gto/strategy.json)")
     args = parser.parse_args()
 
     if args.quick:
         args.hands = 100
+
+    # Apply opponent model flag
+    global _USE_OPPONENT_MODEL
+    if args.no_opponent_model:
+        _USE_OPPONENT_MODEL = False
 
     run_all = not (args.gauntlet or args.offtree or args.bridge or args.leakage or args.behavioral)
 
@@ -458,9 +573,15 @@ def main():
     for stage in stage_bar:
         stage_bar.set_postfix_str(stage)
         if stage == "gauntlet":
-            all_results["gauntlet"] = run_gauntlet(
-                trainer, args.hands, args.seed, args.bb,
-                parallel=not args.no_parallel)
+            if args.seeds:
+                seed_list = [int(s.strip()) for s in args.seeds.split(",")]
+                all_results["gauntlet"] = run_gauntlet_multiseed(
+                    trainer, args.hands, seed_list, args.bb,
+                    parallel=not args.no_parallel)
+            else:
+                all_results["gauntlet"] = run_gauntlet(
+                    trainer, args.hands, args.seed, args.bb,
+                    parallel=not args.no_parallel)
         elif stage == "offtree":
             all_results["offtree"] = run_offtree(
                 trainer, args.hands, args.seed, args.bb)
@@ -485,10 +606,19 @@ def main():
     print("=" * 60)
 
     if "gauntlet" in all_results:
-        summary = all_results["gauntlet"].get("_summary", {})
-        avg = summary.get("avg_bb_per_100", 0)
-        status = "PASS" if avg > -5 else "WARN" if avg > -15 else "FAIL"
-        print(f"  [{status}] Gauntlet avg: {avg:+.1f} bb/100")
+        gauntlet = all_results["gauntlet"]
+        if "summary" in gauntlet and "avg_mean" in gauntlet.get("summary", {}):
+            # Multi-seed format
+            avg = gauntlet["summary"]["avg_mean"]
+            n_seeds = gauntlet["summary"]["num_seeds"]
+            status = "PASS" if avg > -5 else "WARN" if avg > -15 else "FAIL"
+            print(f"  [{status}] Gauntlet avg: {avg:+.1f} bb/100 ({n_seeds} seeds)")
+        else:
+            # Single-seed format
+            summary = gauntlet.get("_summary", {})
+            avg = summary.get("avg_bb_per_100", 0)
+            status = "PASS" if avg > -5 else "WARN" if avg > -15 else "FAIL"
+            print(f"  [{status}] Gauntlet avg: {avg:+.1f} bb/100")
 
     if "offtree" in all_results:
         stress = all_results["offtree"].get("stress_results", [])

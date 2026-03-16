@@ -192,6 +192,41 @@ class InfoSet:
 
 # --- Phase-Aware Action Menus ---
 
+# Module-level grid mode: 13 (v6/B0 compatible) or 16 (v9 expanded)
+# Set via set_action_grid() or detect_action_grid_from_strategy()
+_ACTION_GRID_SIZE = 13  # Default to 13-action for backward compatibility
+
+
+def set_action_grid(size: int) -> None:
+    """Set the action grid size (13 or 16)."""
+    global _ACTION_GRID_SIZE
+    assert size in (13, 16), f"Invalid grid size: {size}"
+    _ACTION_GRID_SIZE = size
+
+
+def get_action_grid() -> int:
+    """Return the current action grid size."""
+    return _ACTION_GRID_SIZE
+
+
+def detect_action_grid_from_strategy(trainer) -> int:
+    """Auto-detect grid size from a loaded strategy's node sizes.
+
+    Checks a sample of postflop nodes: if any have 10+ actions (standard
+    postflop facing bet), it's a 16-action grid. Otherwise 13-action.
+    """
+    for key, node in trainer.nodes.items():
+        if key.startswith(('flop:', 'turn:', 'river:')):
+            n_actions = len(node.get_average_strategy())
+            # 16-action: standard postflop facing bet = 11 actions (fold + call + 9 bet sizes)
+            # 13-action: standard postflop facing bet = 8 actions (fold + call + 6 bet sizes)
+            if n_actions >= 10:
+                return 16
+            elif n_actions in (7, 8):
+                return 13
+    return 13  # Default
+
+
 def get_available_actions(has_bet_to_call: bool, can_raise: bool,
                           phase: str = 'postflop',
                           raise_count: int = 0, history_len: int = -1,
@@ -270,6 +305,7 @@ def _postflop_actions(has_bet_to_call: bool, can_raise: bool,
 
     v6: Added 2/3 pot, overbet (1.25x pot), and donk-bet branches.
     Donk bets available on flop/turn first action (OOP leading).
+    Grid mode 16 adds: quarter pot, 3/4 pot, double pot (v9 expansion).
     """
     if has_bet_to_call:
         actions = [Action.FOLD, Action.CHECK_CALL]
@@ -282,13 +318,18 @@ def _postflop_actions(has_bet_to_call: bool, can_raise: bool,
             actions.extend([Action.DONK_SMALL, Action.DONK_MEDIUM,
                             Action.BET_TWO_THIRDS_POT, Action.BET_POT,
                             Action.ALL_IN])
-        else:
-            # Standard postflop: full sizing menu (v9: +quarter, +3/4, +double)
+        elif _ACTION_GRID_SIZE >= 16:
+            # 16-action grid: full sizing menu (v9 expansion)
             actions.extend([Action.BET_QUARTER_POT, Action.BET_THIRD_POT,
                             Action.BET_HALF_POT, Action.BET_TWO_THIRDS_POT,
                             Action.BET_THREE_QUARTER_POT, Action.BET_POT,
                             Action.BET_OVERBET, Action.BET_DOUBLE_POT,
                             Action.ALL_IN])
+        else:
+            # 13-action grid (v6/B0): standard postflop sizing
+            actions.extend([Action.BET_THIRD_POT, Action.BET_HALF_POT,
+                            Action.BET_TWO_THIRDS_POT, Action.BET_POT,
+                            Action.BET_OVERBET, Action.ALL_IN])
 
     return actions
 

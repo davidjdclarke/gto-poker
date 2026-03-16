@@ -1,0 +1,794 @@
+[
+  {
+    "iterations": 50000,
+    "total_nodes": 863609,
+    "is_b0": true,
+    "well_visited": 557204,
+    "coverage_pct": 64.5,
+    "avg_strategy_weight": 30142.1,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 290616,
+        "well_visited": 193392,
+        "coverage_pct": 66.5,
+        "avg_weight": 33537.2
+      },
+      "preflop": {
+        "total": 5497,
+        "well_visited": 5268,
+        "coverage_pct": 95.8,
+        "avg_weight": 148867.8
+      },
+      "river": {
+        "total": 276914,
+        "well_visited": 158892,
+        "coverage_pct": 57.4,
+        "avg_weight": 19871.3
+      },
+      "turn": {
+        "total": 290582,
+        "well_visited": 199652,
+        "coverage_pct": 68.7,
+        "avg_weight": 34288.4
+      }
+    }
+  },
+  {
+    "iterations": 100000,
+    "total_nodes": 933794,
+    "is_b0": true,
+    "well_visited": 731155,
+    "coverage_pct": 78.3,
+    "avg_strategy_weight": 213112.8,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 310234,
+        "well_visited": 250768,
+        "coverage_pct": 80.8,
+        "avg_weight": 247399.6
+      },
+      "preflop": {
+        "total": 5511,
+        "well_visited": 5496,
+        "coverage_pct": 99.7,
+        "avg_weight": 1217454.6
+      },
+      "river": {
+        "total": 306254,
+        "well_visited": 217207,
+        "coverage_pct": 70.9,
+        "avg_weight": 124235.2
+      },
+      "turn": {
+        "total": 311795,
+        "well_visited": 257684,
+        "coverage_pct": 82.6,
+        "avg_weight": 248544.1
+      }
+    }
+  },
+  {
+    "iterations": 10000000,
+    "total_nodes": 1962590,
+    "is_b0": false,
+    "well_visited": 0,
+    "coverage_pct": 0.0,
+    "avg_strategy_weight": 0.0,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 673539,
+        "well_visited": 0,
+        "coverage_pct": 0.0,
+        "avg_weight": 0.0
+      },
+      "preflop": {
+        "total": 5349,
+        "well_visited": 0,
+        "coverage_pct": 0.0,
+        "avg_weight": 0.0
+      },
+      "river": {
+        "total": 601228,
+        "well_visited": 0,
+        "coverage_pct": 0.0,
+        "avg_weight": 0.0
+      },
+      "turn": {
+        "total": 682474,
+        "well_visited": 0,
+        "coverage_pct": 0.0,
+        "avg_weight": 0.0
+      }
+    }
+  },
+  {
+    "iterations": 20000000,
+    "total_nodes": 1974695,
+    "is_b0": false,
+    "well_visited": 0,
+    "coverage_pct": 0.0,
+    "avg_strategy_weight": 0.0,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 677803,
+        "well_visited": 0,
+        "coverage_pct": 0.0,
+        "avg_weight": 0.0
+      },
+      "preflop": {
+        "total": 5351,
+        "well_visited": 0,
+        "coverage_pct": 0.0,
+        "avg_weight": 0.0
+      },
+      "river": {
+        "total": 605008,
+        "well_visited": 0,
+        "coverage_pct": 0.0,
+        "avg_weight": 0.0
+      },
+      "turn": {
+        "total": 686533,
+        "well_visited": 0,
+        "coverage_pct": 0.0,
+        "avg_weight": 0.0
+      }
+    }
+  },
+  {
+    "iterations": 30000000,
+    "total_nodes": 1982607,
+    "is_b0": false,
+    "well_visited": 223431,
+    "coverage_pct": 11.3,
+    "avg_strategy_weight": 104473438.5,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 680156,
+        "well_visited": 79663,
+        "coverage_pct": 11.7,
+        "avg_weight": 106359882.1
+      },
+      "preflop": {
+        "total": 5352,
+        "well_visited": 5352,
+        "coverage_pct": 100.0,
+        "avg_weight": 6090528625.9
+      },
+      "river": {
+        "total": 608357,
+        "well_visited": 58796,
+        "coverage_pct": 9.7,
+        "avg_weight": 52632823.0
+      },
+      "turn": {
+        "total": 688742,
+        "well_visited": 79620,
+        "coverage_pct": 11.6,
+        "avg_weight": 101884890.1
+      }
+    }
+  },
+  {
+    "iterations": 40000000,
+    "total_nodes": 1988135,
+    "is_b0": false,
+    "well_visited": 255122,
+    "coverage_pct": 12.8,
+    "avg_strategy_weight": 837900967.2,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 681701,
+        "well_visited": 90466,
+        "coverage_pct": 13.3,
+        "avg_weight": 841543828.0
+      },
+      "preflop": {
+        "total": 5352,
+        "well_visited": 5352,
+        "coverage_pct": 100.0,
+        "avg_weight": 54739823051.4
+      },
+      "river": {
+        "total": 610475,
+        "well_visited": 68193,
+        "coverage_pct": 11.2,
+        "avg_weight": 370842085.4
+      },
+      "turn": {
+        "total": 690607,
+        "well_visited": 91111,
+        "coverage_pct": 13.2,
+        "avg_weight": 829446581.5
+      }
+    }
+  },
+  {
+    "iterations": 50000000,
+    "total_nodes": 1991509,
+    "is_b0": false,
+    "well_visited": 269596,
+    "coverage_pct": 13.5,
+    "avg_strategy_weight": 2146534235.8,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 682757,
+        "well_visited": 96066,
+        "coverage_pct": 14.1,
+        "avg_weight": 2110103796.2
+      },
+      "preflop": {
+        "total": 5352,
+        "well_visited": 5352,
+        "coverage_pct": 100.0,
+        "avg_weight": 151655873243.2
+      },
+      "river": {
+        "total": 611649,
+        "well_visited": 71498,
+        "coverage_pct": 11.7,
+        "avg_weight": 895369648.5
+      },
+      "turn": {
+        "total": 691751,
+        "well_visited": 96680,
+        "coverage_pct": 14.0,
+        "avg_weight": 2132038736.8
+      }
+    }
+  },
+  {
+    "iterations": 60000000,
+    "total_nodes": 1993840,
+    "is_b0": false,
+    "well_visited": 278688,
+    "coverage_pct": 14.0,
+    "avg_strategy_weight": 3922123105.7,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 683400,
+        "well_visited": 99039,
+        "coverage_pct": 14.5,
+        "avg_weight": 3786661317.4
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 299543166160.1
+      },
+      "river": {
+        "total": 612408,
+        "well_visited": 73608,
+        "coverage_pct": 12.0,
+        "avg_weight": 1593924155.0
+      },
+      "turn": {
+        "total": 692679,
+        "well_visited": 100688,
+        "coverage_pct": 14.5,
+        "avg_weight": 3829616772.7
+      }
+    }
+  },
+  {
+    "iterations": 70000000,
+    "total_nodes": 1995426,
+    "is_b0": false,
+    "well_visited": 285105,
+    "coverage_pct": 14.3,
+    "avg_strategy_weight": 6181799599.8,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 683839,
+        "well_visited": 101428,
+        "coverage_pct": 14.8,
+        "avg_weight": 5906128512.7
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 498423779149.2
+      },
+      "river": {
+        "total": 613068,
+        "well_visited": 75308,
+        "coverage_pct": 12.3,
+        "avg_weight": 2510320809.0
+      },
+      "turn": {
+        "total": 693166,
+        "well_visited": 103016,
+        "coverage_pct": 14.9,
+        "avg_weight": 5899629792.5
+      }
+    }
+  },
+  {
+    "iterations": 80000000,
+    "total_nodes": 1996640,
+    "is_b0": false,
+    "well_visited": 289714,
+    "coverage_pct": 14.5,
+    "avg_strategy_weight": 8890788822.4,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 684202,
+        "well_visited": 103155,
+        "coverage_pct": 15.1,
+        "avg_weight": 8402564617.9
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 747918212168.2
+      },
+      "river": {
+        "total": 613479,
+        "well_visited": 76544,
+        "coverage_pct": 12.5,
+        "avg_weight": 3567489740.7
+      },
+      "turn": {
+        "total": 693606,
+        "well_visited": 104662,
+        "coverage_pct": 15.1,
+        "avg_weight": 8377186542.9
+      }
+    }
+  },
+  {
+    "iterations": 90000000,
+    "total_nodes": 1997654,
+    "is_b0": false,
+    "well_visited": 292976,
+    "coverage_pct": 14.7,
+    "avg_strategy_weight": 12004586543.2,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 684505,
+        "well_visited": 104423,
+        "coverage_pct": 15.3,
+        "avg_weight": 11247098304.4
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 1046135071575.2
+      },
+      "river": {
+        "total": 613897,
+        "well_visited": 77464,
+        "coverage_pct": 12.6,
+        "avg_weight": 4783540863.4
+      },
+      "turn": {
+        "total": 693899,
+        "well_visited": 105736,
+        "coverage_pct": 15.2,
+        "avg_weight": 11162651737.4
+      }
+    }
+  },
+  {
+    "iterations": 100000000,
+    "total_nodes": 1998261,
+    "is_b0": false,
+    "well_visited": 295388,
+    "coverage_pct": 14.8,
+    "avg_strategy_weight": 15604421731.7,
+    "exploitability": null,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 684741,
+        "well_visited": 105449,
+        "coverage_pct": 15.4,
+        "avg_weight": 14503002596.0
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 1396225534215.8
+      },
+      "river": {
+        "total": 614100,
+        "well_visited": 77968,
+        "coverage_pct": 12.7,
+        "avg_weight": 6097150671.1
+      },
+      "turn": {
+        "total": 694067,
+        "well_visited": 106618,
+        "coverage_pct": 15.4,
+        "avg_weight": 14454874474.2
+      }
+    }
+  },
+  {
+    "iterations": 110000000,
+    "total_nodes": 1998707,
+    "is_b0": false,
+    "well_visited": 297145,
+    "coverage_pct": 14.9,
+    "avg_strategy_weight": 19592208223.1,
+    "exploitability": 42.9555,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 684974,
+        "well_visited": 106443,
+        "coverage_pct": 15.5,
+        "avg_weight": 18174442864.1
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 1798189534349.1
+      },
+      "river": {
+        "total": 614206,
+        "well_visited": 78329,
+        "coverage_pct": 12.8,
+        "avg_weight": 7561939977.0
+      },
+      "turn": {
+        "total": 694174,
+        "well_visited": 107020,
+        "coverage_pct": 15.4,
+        "avg_weight": 17920241051.6
+      }
+    }
+  },
+  {
+    "iterations": 120000000,
+    "total_nodes": 1999030,
+    "is_b0": false,
+    "well_visited": 298475,
+    "coverage_pct": 14.9,
+    "avg_strategy_weight": 24062090593.9,
+    "exploitability": 41.3196,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 685108,
+        "well_visited": 106968,
+        "coverage_pct": 15.6,
+        "avg_weight": 22123037105.4
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 2253699541912.3
+      },
+      "river": {
+        "total": 614293,
+        "well_visited": 78620,
+        "coverage_pct": 12.8,
+        "avg_weight": 9211334722.2
+      },
+      "turn": {
+        "total": 694276,
+        "well_visited": 107534,
+        "coverage_pct": 15.5,
+        "avg_weight": 21924507207.9
+      }
+    }
+  },
+  {
+    "iterations": 130000000,
+    "total_nodes": 1999246,
+    "is_b0": false,
+    "well_visited": 299447,
+    "coverage_pct": 15.0,
+    "avg_strategy_weight": 28973406300.7,
+    "exploitability": 42.2358,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 685218,
+        "well_visited": 107419,
+        "coverage_pct": 15.7,
+        "avg_weight": 26477171282.3
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 2760319235726.2
+      },
+      "river": {
+        "total": 614335,
+        "well_visited": 78881,
+        "coverage_pct": 12.8,
+        "avg_weight": 11056950695.8
+      },
+      "turn": {
+        "total": 694340,
+        "well_visited": 107794,
+        "coverage_pct": 15.5,
+        "avg_weight": 26231632380.1
+      }
+    }
+  },
+  {
+    "iterations": 140000000,
+    "total_nodes": 1999479,
+    "is_b0": false,
+    "well_visited": 300265,
+    "coverage_pct": 15.0,
+    "avg_strategy_weight": 34296349686.6,
+    "exploitability": 42.5711,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 685340,
+        "well_visited": 107725,
+        "coverage_pct": 15.7,
+        "avg_weight": 31135350246.0
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 3318544422688.3
+      },
+      "river": {
+        "total": 614335,
+        "well_visited": 78988,
+        "coverage_pct": 12.9,
+        "avg_weight": 13019325108.7
+      },
+      "turn": {
+        "total": 694451,
+        "well_visited": 108199,
+        "coverage_pct": 15.6,
+        "avg_weight": 30922461991.1
+      }
+    }
+  },
+  {
+    "iterations": 150000000,
+    "total_nodes": 1999601,
+    "is_b0": false,
+    "well_visited": 300906,
+    "coverage_pct": 15.0,
+    "avg_strategy_weight": 40096826937.5,
+    "exploitability": 39.9929,
+    "gauntlet_avg": 226.8,
+    "per_phase": {
+      "flop": {
+        "total": 685387,
+        "well_visited": 107976,
+        "coverage_pct": 15.8,
+        "avg_weight": 36236197945.5
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 3924116533438.1
+      },
+      "river": {
+        "total": 614335,
+        "well_visited": 79085,
+        "coverage_pct": 12.9,
+        "avg_weight": 15138830940.1
+      },
+      "turn": {
+        "total": 694526,
+        "well_visited": 108492,
+        "coverage_pct": 15.6,
+        "avg_weight": 36047213107.6
+      }
+    }
+  },
+  {
+    "iterations": 160000000,
+    "total_nodes": 1999701,
+    "is_b0": false,
+    "well_visited": 301396,
+    "coverage_pct": 15.1,
+    "avg_strategy_weight": 46302942712.4,
+    "exploitability": 39.7531,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 685481,
+        "well_visited": 108305,
+        "coverage_pct": 15.8,
+        "avg_weight": 41762936074.1
+      },
+      "preflop": {
+        "total": 5353,
+        "well_visited": 5353,
+        "coverage_pct": 100.0,
+        "avg_weight": 4579238314719.7
+      },
+      "river": {
+        "total": 614335,
+        "well_visited": 79175,
+        "coverage_pct": 12.9,
+        "avg_weight": 17438522721.0
+      },
+      "turn": {
+        "total": 694532,
+        "well_visited": 108563,
+        "coverage_pct": 15.6,
+        "avg_weight": 41378344133.0
+      }
+    }
+  },
+  {
+    "iterations": 170000000,
+    "total_nodes": 1999757,
+    "is_b0": false,
+    "well_visited": 301797,
+    "coverage_pct": 15.1,
+    "avg_strategy_weight": 52907190605.5,
+    "exploitability": 44.16,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 685535,
+        "well_visited": 108567,
+        "coverage_pct": 15.8,
+        "avg_weight": 47599733908.9
+      },
+      "preflop": {
+        "total": 5355,
+        "well_visited": 5355,
+        "coverage_pct": 100.0,
+        "avg_weight": 5277619274699.6
+      },
+      "river": {
+        "total": 614335,
+        "well_visited": 79258,
+        "coverage_pct": 12.9,
+        "avg_weight": 19919020541.7
+      },
+      "turn": {
+        "total": 694532,
+        "well_visited": 108617,
+        "coverage_pct": 15.6,
+        "avg_weight": 47041228450.2
+      }
+    }
+  },
+  {
+    "iterations": 180000000,
+    "total_nodes": 1999804,
+    "is_b0": false,
+    "well_visited": 302188,
+    "coverage_pct": 15.1,
+    "avg_strategy_weight": 60004155312.7,
+    "exploitability": 40.118,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 685582,
+        "well_visited": 108833,
+        "coverage_pct": 15.9,
+        "avg_weight": 53908250442.8
+      },
+      "preflop": {
+        "total": 5355,
+        "well_visited": 5355,
+        "coverage_pct": 100.0,
+        "avg_weight": 6028743379527.9
+      },
+      "river": {
+        "total": 614335,
+        "well_visited": 79341,
+        "coverage_pct": 12.9,
+        "avg_weight": 22569162798.1
+      },
+      "turn": {
+        "total": 694532,
+        "well_visited": 108659,
+        "coverage_pct": 15.6,
+        "avg_weight": 53113573213.2
+      }
+    }
+  },
+  {
+    "iterations": 190000000,
+    "total_nodes": 1999841,
+    "is_b0": false,
+    "well_visited": 302441,
+    "coverage_pct": 15.1,
+    "avg_strategy_weight": 67536376402.7,
+    "exploitability": 42.8896,
+    "gauntlet_avg": null,
+    "per_phase": {
+      "flop": {
+        "total": 685619,
+        "well_visited": 108987,
+        "coverage_pct": 15.9,
+        "avg_weight": 60554942356.8
+      },
+      "preflop": {
+        "total": 5355,
+        "well_visited": 5355,
+        "coverage_pct": 100.0,
+        "avg_weight": 6828786118429.8
+      },
+      "river": {
+        "total": 614335,
+        "well_visited": 79417,
+        "coverage_pct": 12.9,
+        "avg_weight": 25390879694.6
+      },
+      "turn": {
+        "total": 694532,
+        "well_visited": 108682,
+        "coverage_pct": 15.6,
+        "avg_weight": 59576433852.5
+      }
+    }
+  },
+  {
+    "iterations": 200000000,
+    "total_nodes": 1999902,
+    "is_b0": false,
+    "well_visited": 302689,
+    "coverage_pct": 15.1,
+    "avg_strategy_weight": 75538619595.6,
+    "exploitability": 41.4001,
+    "gauntlet_avg": 318.0,
+    "per_phase": {
+      "flop": {
+        "total": 685680,
+        "well_visited": 109135,
+        "coverage_pct": 15.9,
+        "avg_weight": 67605765393.5
+      },
+      "preflop": {
+        "total": 5355,
+        "well_visited": 5355,
+        "coverage_pct": 100.0,
+        "avg_weight": 7681814314569.7
+      },
+      "river": {
+        "total": 614335,
+        "well_visited": 79493,
+        "coverage_pct": 12.9,
+        "avg_weight": 28398179100.1
+      },
+      "turn": {
+        "total": 694532,
+        "well_visited": 108706,
+        "coverage_pct": 15.7,
+        "avg_weight": 66421423605.3
+      }
+    }
+  }
+]

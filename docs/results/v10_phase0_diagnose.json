@@ -1,0 +1,2179 @@
+{
+  "CallStationBot": {
+    "B0": {
+      "bb_per_100": 185.4,
+      "street_ev": {
+        "preflop": -285.43,
+        "flop": -313.11,
+        "turn": -579.31,
+        "river": -620.87
+      },
+      "action_ev": {
+        "preflop": {
+          "fold": {
+            "total_ev_bb": -110.0,
+            "count": 220,
+            "avg_ev_bb": -0.5
+          },
+          "check": {
+            "total_ev_bb": 7309.85,
+            "count": 2453,
+            "avg_ev_bb": 2.98
+          },
+          "call": {
+            "total_ev_bb": 1034.95,
+            "count": 2238,
+            "avg_ev_bb": 0.46
+          },
+          "bet": {
+            "total_ev_bb": 1035.4,
+            "count": 89,
+            "avg_ev_bb": 11.63
+          }
+        },
+        "flop": {
+          "fold": {
+            "total_ev_bb": -94.5,
+            "count": 92,
+            "avg_ev_bb": -1.03
+          },
+          "check": {
+            "total_ev_bb": -2383.4,
+            "count": 3575,
+            "avg_ev_bb": -0.67
+          },
+          "call": {
+            "total_ev_bb": -2416.1,
+            "count": 109,
+            "avg_ev_bb": -22.17
+          },
+          "bet": {
+            "total_ev_bb": 11436.35,
+            "count": 1130,
+            "avg_ev_bb": 10.12
+          }
+        },
+        "turn": {
+          "fold": {
+            "total_ev_bb": -147.05,
+            "count": 100,
+            "avg_ev_bb": -1.47
+          },
+          "check": {
+            "total_ev_bb": -1261.95,
+            "count": 3177,
+            "avg_ev_bb": -0.4
+          },
+          "call": {
+            "total_ev_bb": -504.85,
+            "count": 133,
+            "avg_ev_bb": -3.8
+          },
+          "bet": {
+            "total_ev_bb": 8907.5,
+            "count": 1407,
+            "avg_ev_bb": 6.33
+          }
+        },
+        "river": {
+          "fold": {
+            "total_ev_bb": -850.75,
+            "count": 254,
+            "avg_ev_bb": -3.35
+          },
+          "check": {
+            "total_ev_bb": -314.75,
+            "count": 2904,
+            "avg_ev_bb": -0.11
+          },
+          "call": {
+            "total_ev_bb": -1269.7,
+            "count": 225,
+            "avg_ev_bb": -5.64
+          },
+          "bet": {
+            "total_ev_bb": 14329.35,
+            "count": 1336,
+            "avg_ev_bb": 10.73
+          }
+        }
+      },
+      "bucket_ev": {
+        "0": {
+          "total_ev_bb": -8354.05,
+          "count": 598,
+          "avg_ev_bb": -13.97
+        },
+        "1": {
+          "total_ev_bb": -8311.95,
+          "count": 704,
+          "avg_ev_bb": -11.81
+        },
+        "2": {
+          "total_ev_bb": -3659.35,
+          "count": 813,
+          "avg_ev_bb": -4.5
+        },
+        "3": {
+          "total_ev_bb": -2442.25,
+          "count": 551,
+          "avg_ev_bb": -4.43
+        },
+        "4": {
+          "total_ev_bb": -3236.85,
+          "count": 517,
+          "avg_ev_bb": -6.26
+        },
+        "5": {
+          "total_ev_bb": -846.05,
+          "count": 558,
+          "avg_ev_bb": -1.52
+        },
+        "6": {
+          "total_ev_bb": 1914.15,
+          "count": 546,
+          "avg_ev_bb": 3.51
+        },
+        "7": {
+          "total_ev_bb": 34206.55,
+          "count": 713,
+          "avg_ev_bb": 47.98
+        }
+      },
+      "callstation_dashboard": {
+        "slowplay_leak": {
+          "count": 1824,
+          "total_ev_bb": 10654.1,
+          "avg_ev_bb": 5.841063596491228,
+          "by_phase": {
+            "flop": {
+              "count": 418,
+              "avg_ev_bb": 9.773325358851675
+            },
+            "preflop": {
+              "count": 329,
+              "avg_ev_bb": 11.533434650455927
+            },
+            "river": {
+              "count": 692,
+              "avg_ev_bb": 1.2762283236994219
+            },
+            "turn": {
+              "count": 385,
+              "avg_ev_bb": 4.912207792207792
+            }
+          },
+          "by_eq": {
+            "5": {
+              "count": 1448,
+              "avg_ev_bb": 4.691401933701657
+            },
+            "6": {
+              "count": 240,
+              "avg_ev_bb": 12.469791666666667
+            },
+            "7": {
+              "count": 136,
+              "avg_ev_bb": 6.383823529411765
+            }
+          }
+        },
+        "bluff_leak": {
+          "count": 600,
+          "total_ev_bb": -15014.5,
+          "avg_ev_bb": -25.024166666666666,
+          "by_phase": {
+            "turn": {
+              "count": 138,
+              "avg_ev_bb": -35.14746376811595
+            },
+            "river": {
+              "count": 367,
+              "avg_ev_bb": -19.166348773841964
+            },
+            "flop": {
+              "count": 61,
+              "avg_ev_bb": -64.91147540983606
+            },
+            "preflop": {
+              "count": 34,
+              "avg_ev_bb": 24.397058823529413
+            }
+          },
+          "by_eq": {
+            "0": {
+              "count": 395,
+              "avg_ev_bb": -15.686329113924051
+            },
+            "1": {
+              "count": 95,
+              "avg_ev_bb": -41.68157894736842
+            },
+            "2": {
+              "count": 110,
+              "avg_ev_bb": -44.16954545454545
+            }
+          }
+        },
+        "thin_value_leak": {
+          "count": 5884,
+          "total_ev_bb": 4033.75,
+          "avg_ev_bb": 0.6855455472467709,
+          "by_phase": {
+            "river": {
+              "count": 965,
+              "avg_ev_bb": -0.18481865284974092
+            },
+            "preflop": {
+              "count": 1875,
+              "avg_ev_bb": 2.729386666666667
+            },
+            "flop": {
+              "count": 1702,
+              "avg_ev_bb": -1.125822561692127
+            },
+            "turn": {
+              "count": 1342,
+              "avg_ev_bb": 0.7530923994038748
+            }
+          },
+          "by_eq": {
+            "3": {
+              "count": 2986,
+              "avg_ev_bb": -0.6085231078365706
+            },
+            "4": {
+              "count": 2898,
+              "avg_ev_bb": 2.018909592822636
+            }
+          }
+        },
+        "num_hands": 5000,
+        "overall_bb_per_100": 185.40400000000002
+      },
+      "bridge_pain": {
+        "total_events": 1238,
+        "by_mapped_action": {
+          "bet half pot": {
+            "count": 1238,
+            "avg_distance": 0.167,
+            "max_distance": 0.167,
+            "concrete_range": [
+              0.333,
+              0.333
+            ],
+            "nominal": 0.5
+          }
+        },
+        "by_phase": {
+          "flop": {
+            "count": 316,
+            "avg_distance": 0.167
+          },
+          "turn": {
+            "count": 412,
+            "avg_distance": 0.167
+          },
+          "river": {
+            "count": 510,
+            "avg_distance": 0.167
+          }
+        },
+        "worst_gaps": [
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "flop",
+            "bucket": 57
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "turn",
+            "bucket": 57
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "flop",
+            "bucket": 72
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "turn",
+            "bucket": 58
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "river",
+            "bucket": 55
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "river",
+            "bucket": 14
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "river",
+            "bucket": 73
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "flop",
+            "bucket": 73
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "turn",
+            "bucket": 43
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "river",
+            "bucket": 88
+          }
+        ]
+      }
+    },
+    "v7": {
+      "bb_per_100": 144.47,
+      "street_ev": {
+        "preflop": -215.76,
+        "flop": -448.66,
+        "turn": -675.39,
+        "river": -593.95
+      },
+      "action_ev": {
+        "preflop": {
+          "fold": {
+            "total_ev_bb": -115.5,
+            "count": 231,
+            "avg_ev_bb": -0.5
+          },
+          "check": {
+            "total_ev_bb": 5138.7,
+            "count": 2461,
+            "avg_ev_bb": 2.09
+          },
+          "call": {
+            "total_ev_bb": 1736.6,
+            "count": 2220,
+            "avg_ev_bb": 0.78
+          },
+          "bet": {
+            "total_ev_bb": 463.5,
+            "count": 88,
+            "avg_ev_bb": 5.27
+          }
+        },
+        "flop": {
+          "fold": {
+            "total_ev_bb": -92.5,
+            "count": 90,
+            "avg_ev_bb": -1.03
+          },
+          "check": {
+            "total_ev_bb": -5285.85,
+            "count": 3303,
+            "avg_ev_bb": -1.6
+          },
+          "call": {
+            "total_ev_bb": -1921.2,
+            "count": 86,
+            "avg_ev_bb": -22.34
+          },
+          "bet": {
+            "total_ev_bb": 13779.4,
+            "count": 1404,
+            "avg_ev_bb": 9.81
+          }
+        },
+        "turn": {
+          "fold": {
+            "total_ev_bb": -196.85,
+            "count": 120,
+            "avg_ev_bb": -1.64
+          },
+          "check": {
+            "total_ev_bb": -3285.7,
+            "count": 3061,
+            "avg_ev_bb": -1.07
+          },
+          "call": {
+            "total_ev_bb": -1067.6,
+            "count": 133,
+            "avg_ev_bb": -8.03
+          },
+          "bet": {
+            "total_ev_bb": 6824.95,
+            "count": 1503,
+            "avg_ev_bb": 4.54
+          }
+        },
+        "river": {
+          "fold": {
+            "total_ev_bb": -980.9,
+            "count": 260,
+            "avg_ev_bb": -3.77
+          },
+          "check": {
+            "total_ev_bb": -1282.55,
+            "count": 2862,
+            "avg_ev_bb": -0.45
+          },
+          "call": {
+            "total_ev_bb": -1561.6,
+            "count": 227,
+            "avg_ev_bb": -6.88
+          },
+          "bet": {
+            "total_ev_bb": 9098.15,
+            "count": 1333,
+            "avg_ev_bb": 6.83
+          }
+        }
+      },
+      "bucket_ev": {
+        "0": {
+          "total_ev_bb": -12222.45,
+          "count": 600,
+          "avg_ev_bb": -20.37
+        },
+        "1": {
+          "total_ev_bb": -7314.2,
+          "count": 696,
+          "avg_ev_bb": -10.51
+        },
+        "2": {
+          "total_ev_bb": -2833.6,
+          "count": 809,
+          "avg_ev_bb": -3.5
+        },
+        "3": {
+          "total_ev_bb": -3437.5,
+          "count": 545,
+          "avg_ev_bb": -6.31
+        },
+        "4": {
+          "total_ev_bb": -2248.6,
+          "count": 536,
+          "avg_ev_bb": -4.2
+        },
+        "5": {
+          "total_ev_bb": -366.9,
+          "count": 544,
+          "avg_ev_bb": -0.67
+        },
+        "6": {
+          "total_ev_bb": 2810.55,
+          "count": 558,
+          "avg_ev_bb": 5.04
+        },
+        "7": {
+          "total_ev_bb": 32836.0,
+          "count": 712,
+          "avg_ev_bb": 46.12
+        }
+      },
+      "callstation_dashboard": {
+        "slowplay_leak": {
+          "count": 1770,
+          "total_ev_bb": 9524.45,
+          "avg_ev_bb": 5.3810451977401135,
+          "by_phase": {
+            "preflop": {
+              "count": 343,
+              "avg_ev_bb": 2.3122448979591836
+            },
+            "river": {
+              "count": 663,
+              "avg_ev_bb": 0.5264705882352941
+            },
+            "turn": {
+              "count": 369,
+              "avg_ev_bb": 10.423983739837398
+            },
+            "flop": {
+              "count": 395,
+              "avg_ev_bb": 11.483164556962027
+            }
+          },
+          "by_eq": {
+            "5": {
+              "count": 1419,
+              "avg_ev_bb": 4.414164904862579
+            },
+            "6": {
+              "count": 236,
+              "avg_ev_bb": 8.36949152542373
+            },
+            "7": {
+              "count": 115,
+              "avg_ev_bb": 11.178695652173912
+            }
+          }
+        },
+        "bluff_leak": {
+          "count": 563,
+          "total_ev_bb": -16410.65,
+          "avg_ev_bb": -29.148579040852578,
+          "by_phase": {
+            "river": {
+              "count": 335,
+              "avg_ev_bb": -19.2610447761194
+            },
+            "flop": {
+              "count": 73,
+              "avg_ev_bb": -48.894520547945206
+            },
+            "turn": {
+              "count": 125,
+              "avg_ev_bb": -57.9564
+            },
+            "preflop": {
+              "count": 30,
+              "avg_ev_bb": 28.521666666666665
+            }
+          },
+          "by_eq": {
+            "0": {
+              "count": 347,
+              "avg_ev_bb": -14.150144092219021
+            },
+            "1": {
+              "count": 92,
+              "avg_ev_bb": -86.27880434782608
+            },
+            "2": {
+              "count": 124,
+              "avg_ev_bb": -28.733064516129033
+            }
+          }
+        },
+        "thin_value_leak": {
+          "count": 5545,
+          "total_ev_bb": -57.85000000000002,
+          "avg_ev_bb": -0.010432822362488733,
+          "by_phase": {
+            "river": {
+              "count": 964,
+              "avg_ev_bb": -0.6107365145228216
+            },
+            "preflop": {
+              "count": 1872,
+              "avg_ev_bb": 2.93571047008547
+            },
+            "flop": {
+              "count": 1491,
+              "avg_ev_bb": -1.6230046948356809
+            },
+            "turn": {
+              "count": 1218,
+              "avg_ev_bb": -2.0893678160919538
+            }
+          },
+          "by_eq": {
+            "3": {
+              "count": 2965,
+              "avg_ev_bb": -2.699443507588533
+            },
+            "4": {
+              "count": 2580,
+              "avg_ev_bb": 3.07984496124031
+            }
+          }
+        },
+        "num_hands": 5000,
+        "overall_bb_per_100": 144.466
+      },
+      "bridge_pain": {
+        "total_events": 1272,
+        "by_mapped_action": {
+          "bet half pot": {
+            "count": 1272,
+            "avg_distance": 0.167,
+            "max_distance": 0.167,
+            "concrete_range": [
+              0.333,
+              0.333
+            ],
+            "nominal": 0.5
+          }
+        },
+        "by_phase": {
+          "flop": {
+            "count": 301,
+            "avg_distance": 0.167
+          },
+          "turn": {
+            "count": 438,
+            "avg_distance": 0.167
+          },
+          "river": {
+            "count": 533,
+            "avg_distance": 0.167
+          }
+        },
+        "worst_gaps": [
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "flop",
+            "bucket": 57
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "turn",
+            "bucket": 57
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "flop",
+            "bucket": 72
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "turn",
+            "bucket": 58
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "river",
+            "bucket": 55
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "river",
+            "bucket": 14
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "river",
+            "bucket": 73
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "turn",
+            "bucket": 43
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "river",
+            "bucket": 89
+          },
+          {
+            "concrete_ratio": 0.333,
+            "mapped_action": 3,
+            "mapped_name": "bet half pot",
+            "nominal_ratio": 0.5,
+            "distance": 0.167,
+            "phase": "turn",
+            "bucket": 89
+          }
+        ]
+      }
+    },
+    "delta": {
+      "bb_per_100": 40.93,
+      "street_ev": {
+        "river": -26.92,
+        "flop": 135.55,
+        "preflop": -69.67,
+        "turn": 96.08
+      },
+      "bucket_ev": {
+        "0": 6.4,
+        "1": -1.3,
+        "2": -1.0,
+        "3": 1.88,
+        "4": -2.06,
+        "5": -0.85,
+        "6": -1.53,
+        "7": 1.86
+      }
+    }
+  },
+  "NitBot": {
+    "B0": {
+      "bb_per_100": 40.1,
+      "street_ev": {
+        "preflop": -241.43,
+        "flop": -373.87,
+        "turn": -553.18,
+        "river": -491.46
+      },
+      "action_ev": {
+        "preflop": {
+          "fold": {
+            "total_ev_bb": -362.0,
+            "count": 419,
+            "avg_ev_bb": -0.86
+          },
+          "check": {
+            "total_ev_bb": -1225.7,
+            "count": 766,
+            "avg_ev_bb": -1.6
+          },
+          "call": {
+            "total_ev_bb": 2380.7,
+            "count": 2327,
+            "avg_ev_bb": 1.02
+          },
+          "bet": {
+            "total_ev_bb": -1490.0,
+            "count": 73,
+            "avg_ev_bb": -20.41
+          }
+        },
+        "flop": {
+          "fold": {
+            "total_ev_bb": -639.95,
+            "count": 251,
+            "avg_ev_bb": -2.55
+          },
+          "check": {
+            "total_ev_bb": -2411.15,
+            "count": 1993,
+            "avg_ev_bb": -1.21
+          },
+          "call": {
+            "total_ev_bb": 1122.6,
+            "count": 320,
+            "avg_ev_bb": 3.51
+          },
+          "bet": {
+            "total_ev_bb": 3726.6,
+            "count": 689,
+            "avg_ev_bb": 5.41
+          }
+        },
+        "turn": {
+          "fold": {
+            "total_ev_bb": -2547.15,
+            "count": 213,
+            "avg_ev_bb": -11.96
+          },
+          "check": {
+            "total_ev_bb": -586.55,
+            "count": 1528,
+            "avg_ev_bb": -0.38
+          },
+          "call": {
+            "total_ev_bb": -333.55,
+            "count": 347,
+            "avg_ev_bb": -0.96
+          },
+          "bet": {
+            "total_ev_bb": 857.35,
+            "count": 613,
+            "avg_ev_bb": 1.4
+          }
+        },
+        "river": {
+          "fold": {
+            "total_ev_bb": -2095.9,
+            "count": 187,
+            "avg_ev_bb": -11.21
+          },
+          "check": {
+            "total_ev_bb": -838.15,
+            "count": 1182,
+            "avg_ev_bb": -0.71
+          },
+          "call": {
+            "total_ev_bb": -1792.3,
+            "count": 227,
+            "avg_ev_bb": -7.9
+          },
+          "bet": {
+            "total_ev_bb": 4599.85,
+            "count": 509,
+            "avg_ev_bb": 9.04
+          }
+        }
+      },
+      "bucket_ev": {
+        "0": {
+          "total_ev_bb": -1558.8,
+          "count": 247,
+          "avg_ev_bb": -6.31
+        },
+        "1": {
+          "total_ev_bb": -1286.15,
+          "count": 399,
+          "avg_ev_bb": -3.22
+        },
+        "2": {
+          "total_ev_bb": -1741.8,
+          "count": 843,
+          "avg_ev_bb": -2.07
+        },
+        "3": {
+          "total_ev_bb": -1502.7,
+          "count": 1098,
+          "avg_ev_bb": -1.37
+        },
+        "4": {
+          "total_ev_bb": -1651.95,
+          "count": 948,
+          "avg_ev_bb": -1.74
+        },
+        "5": {
+          "total_ev_bb": -2280.8,
+          "count": 584,
+          "avg_ev_bb": -3.91
+        },
+        "6": {
+          "total_ev_bb": 103.3,
+          "count": 477,
+          "avg_ev_bb": 0.22
+        },
+        "7": {
+          "total_ev_bb": 11924.05,
+          "count": 404,
+          "avg_ev_bb": 29.51
+        }
+      },
+      "callstation_dashboard": null,
+      "bridge_pain": {
+        "total_events": 2091,
+        "by_mapped_action": {
+          "bet 2/3 pot": {
+            "count": 1781,
+            "avg_distance": 0.285,
+            "max_distance": 0.37,
+            "concrete_range": [
+              0.3,
+              0.401
+            ],
+            "nominal": 0.67
+          },
+          "open raise": {
+            "count": 298,
+            "avg_distance": 0.27,
+            "max_distance": 0.27,
+            "concrete_range": [
+              0.6,
+              0.6
+            ],
+            "nominal": 0.33
+          },
+          "bet 1/4 pot": {
+            "count": 4,
+            "avg_distance": 0.171,
+            "max_distance": 0.232,
+            "concrete_range": [
+              0.018,
+              0.126
+            ],
+            "nominal": 0.25
+          },
+          "4-bet": {
+            "count": 3,
+            "avg_distance": 0.397,
+            "max_distance": 0.397,
+            "concrete_range": [
+              0.273,
+              0.273
+            ],
+            "nominal": 0.67
+          },
+          "bet half pot": {
+            "count": 2,
+            "avg_distance": 0.214,
+            "max_distance": 0.229,
+            "concrete_range": [
+              0.271,
+              0.302
+            ],
+            "nominal": 0.5
+          },
+          "3-bet": {
+            "count": 2,
+            "avg_distance": 0.2,
+            "max_distance": 0.2,
+            "concrete_range": [
+              0.3,
+              0.3
+            ],
+            "nominal": 0.5
+          },
+          "bet 1/3 pot": {
+            "count": 1,
+            "avg_distance": 0.136,
+            "max_distance": 0.136,
+            "concrete_range": [
+              0.194,
+              0.194
+            ],
+            "nominal": 0.33
+          }
+        },
+        "by_phase": {
+          "flop": {
+            "count": 657,
+            "avg_distance": 0.287
+          },
+          "turn": {
+            "count": 679,
+            "avg_distance": 0.285
+          },
+          "river": {
+            "count": 452,
+            "avg_distance": 0.281
+          },
+          "preflop": {
+            "count": 303,
+            "avg_distance": 0.271
+          }
+        },
+        "worst_gaps": [
+          {
+            "concrete_ratio": 0.273,
+            "mapped_action": 8,
+            "mapped_name": "4-bet",
+            "nominal_ratio": 0.67,
+            "distance": 0.397,
+            "phase": "preflop",
+            "bucket": 52
+          },
+          {
+            "concrete_ratio": 0.273,
+            "mapped_action": 8,
+            "mapped_name": "4-bet",
+            "nominal_ratio": 0.67,
+            "distance": 0.397,
+            "phase": "preflop",
+            "bucket": 59
+          },
+          {
+            "concrete_ratio": 0.273,
+            "mapped_action": 8,
+            "mapped_name": "4-bet",
+            "nominal_ratio": 0.67,
+            "distance": 0.397,
+            "phase": "preflop",
+            "bucket": 59
+          },
+          {
+            "concrete_ratio": 0.3,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.37,
+            "phase": "river",
+            "bucket": 14
+          },
+          {
+            "concrete_ratio": 0.3,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.37,
+            "phase": "river",
+            "bucket": 118
+          },
+          {
+            "concrete_ratio": 0.3,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.37,
+            "phase": "river",
+            "bucket": 118
+          },
+          {
+            "concrete_ratio": 0.301,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.369,
+            "phase": "river",
+            "bucket": 118
+          },
+          {
+            "concrete_ratio": 0.301,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.369,
+            "phase": "river",
+            "bucket": 118
+          },
+          {
+            "concrete_ratio": 0.306,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.364,
+            "phase": "turn",
+            "bucket": 58
+          },
+          {
+            "concrete_ratio": 0.308,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.362,
+            "phase": "turn",
+            "bucket": 118
+          }
+        ]
+      }
+    },
+    "v7": {
+      "bb_per_100": -2.29,
+      "street_ev": {
+        "preflop": -172.04,
+        "flop": -352.92,
+        "turn": -454.24,
+        "river": -427.21
+      },
+      "action_ev": {
+        "preflop": {
+          "fold": {
+            "total_ev_bb": -387.5,
+            "count": 417,
+            "avg_ev_bb": -0.93
+          },
+          "check": {
+            "total_ev_bb": -2763.0,
+            "count": 776,
+            "avg_ev_bb": -3.56
+          },
+          "call": {
+            "total_ev_bb": 1020.8,
+            "count": 2333,
+            "avg_ev_bb": 0.44
+          },
+          "bet": {
+            "total_ev_bb": -1019.0,
+            "count": 68,
+            "avg_ev_bb": -14.99
+          }
+        },
+        "flop": {
+          "fold": {
+            "total_ev_bb": -629.8,
+            "count": 249,
+            "avg_ev_bb": -2.53
+          },
+          "check": {
+            "total_ev_bb": -2822.0,
+            "count": 1906,
+            "avg_ev_bb": -1.48
+          },
+          "call": {
+            "total_ev_bb": -1616.05,
+            "count": 324,
+            "avg_ev_bb": -4.99
+          },
+          "bet": {
+            "total_ev_bb": -1976.1,
+            "count": 765,
+            "avg_ev_bb": -2.58
+          }
+        },
+        "turn": {
+          "fold": {
+            "total_ev_bb": -1370.35,
+            "count": 218,
+            "avg_ev_bb": -6.29
+          },
+          "check": {
+            "total_ev_bb": -2849.65,
+            "count": 1449,
+            "avg_ev_bb": -1.97
+          },
+          "call": {
+            "total_ev_bb": -3474.25,
+            "count": 320,
+            "avg_ev_bb": -10.86
+          },
+          "bet": {
+            "total_ev_bb": 2920.95,
+            "count": 635,
+            "avg_ev_bb": 4.6
+          }
+        },
+        "river": {
+          "fold": {
+            "total_ev_bb": -1653.9,
+            "count": 188,
+            "avg_ev_bb": -8.8
+          },
+          "check": {
+            "total_ev_bb": -2337.85,
+            "count": 1171,
+            "avg_ev_bb": -2.0
+          },
+          "call": {
+            "total_ev_bb": -3474.05,
+            "count": 211,
+            "avg_ev_bb": -16.46
+          },
+          "bet": {
+            "total_ev_bb": -718.15,
+            "count": 448,
+            "avg_ev_bb": -1.6
+          }
+        }
+      },
+      "bucket_ev": {
+        "0": {
+          "total_ev_bb": -3069.05,
+          "count": 229,
+          "avg_ev_bb": -13.4
+        },
+        "1": {
+          "total_ev_bb": -827.7,
+          "count": 402,
+          "avg_ev_bb": -2.06
+        },
+        "2": {
+          "total_ev_bb": -1622.45,
+          "count": 832,
+          "avg_ev_bb": -1.95
+        },
+        "3": {
+          "total_ev_bb": -894.6,
+          "count": 1040,
+          "avg_ev_bb": -0.86
+        },
+        "4": {
+          "total_ev_bb": -2318.85,
+          "count": 1016,
+          "avg_ev_bb": -2.28
+        },
+        "5": {
+          "total_ev_bb": -2432.15,
+          "count": 644,
+          "avg_ev_bb": -3.78
+        },
+        "6": {
+          "total_ev_bb": -478.45,
+          "count": 466,
+          "avg_ev_bb": -1.03
+        },
+        "7": {
+          "total_ev_bb": 11528.65,
+          "count": 371,
+          "avg_ev_bb": 31.07
+        }
+      },
+      "callstation_dashboard": null,
+      "bridge_pain": {
+        "total_events": 2027,
+        "by_mapped_action": {
+          "bet 2/3 pot": {
+            "count": 1718,
+            "avg_distance": 0.284,
+            "max_distance": 0.37,
+            "concrete_range": [
+              0.3,
+              0.401
+            ],
+            "nominal": 0.67
+          },
+          "open raise": {
+            "count": 300,
+            "avg_distance": 0.27,
+            "max_distance": 0.27,
+            "concrete_range": [
+              0.6,
+              0.6
+            ],
+            "nominal": 0.33
+          },
+          "bet 1/3 pot": {
+            "count": 2,
+            "avg_distance": 0.119,
+            "max_distance": 0.124,
+            "concrete_range": [
+              0.206,
+              0.216
+            ],
+            "nominal": 0.33
+          },
+          "4-bet": {
+            "count": 5,
+            "avg_distance": 0.397,
+            "max_distance": 0.397,
+            "concrete_range": [
+              0.273,
+              0.273
+            ],
+            "nominal": 0.67
+          },
+          "bet 1/4 pot": {
+            "count": 2,
+            "avg_distance": 0.165,
+            "max_distance": 0.208,
+            "concrete_range": [
+              0.042,
+              0.127
+            ],
+            "nominal": 0.25
+          }
+        },
+        "by_phase": {
+          "flop": {
+            "count": 650,
+            "avg_distance": 0.287
+          },
+          "turn": {
+            "count": 638,
+            "avg_distance": 0.284
+          },
+          "river": {
+            "count": 434,
+            "avg_distance": 0.278
+          },
+          "preflop": {
+            "count": 305,
+            "avg_distance": 0.272
+          }
+        },
+        "worst_gaps": [
+          {
+            "concrete_ratio": 0.273,
+            "mapped_action": 8,
+            "mapped_name": "4-bet",
+            "nominal_ratio": 0.67,
+            "distance": 0.397,
+            "phase": "preflop",
+            "bucket": 52
+          },
+          {
+            "concrete_ratio": 0.273,
+            "mapped_action": 8,
+            "mapped_name": "4-bet",
+            "nominal_ratio": 0.67,
+            "distance": 0.397,
+            "phase": "preflop",
+            "bucket": 69
+          },
+          {
+            "concrete_ratio": 0.273,
+            "mapped_action": 8,
+            "mapped_name": "4-bet",
+            "nominal_ratio": 0.67,
+            "distance": 0.397,
+            "phase": "preflop",
+            "bucket": 59
+          },
+          {
+            "concrete_ratio": 0.273,
+            "mapped_action": 8,
+            "mapped_name": "4-bet",
+            "nominal_ratio": 0.67,
+            "distance": 0.397,
+            "phase": "preflop",
+            "bucket": 73
+          },
+          {
+            "concrete_ratio": 0.273,
+            "mapped_action": 8,
+            "mapped_name": "4-bet",
+            "nominal_ratio": 0.67,
+            "distance": 0.397,
+            "phase": "preflop",
+            "bucket": 63
+          },
+          {
+            "concrete_ratio": 0.3,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.37,
+            "phase": "river",
+            "bucket": 14
+          },
+          {
+            "concrete_ratio": 0.306,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.364,
+            "phase": "turn",
+            "bucket": 119
+          },
+          {
+            "concrete_ratio": 0.306,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.364,
+            "phase": "river",
+            "bucket": 14
+          },
+          {
+            "concrete_ratio": 0.306,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.364,
+            "phase": "turn",
+            "bucket": 118
+          },
+          {
+            "concrete_ratio": 0.306,
+            "mapped_action": 9,
+            "mapped_name": "bet 2/3 pot",
+            "nominal_ratio": 0.67,
+            "distance": 0.364,
+            "phase": "river",
+            "bucket": 115
+          }
+        ]
+      }
+    },
+    "delta": {
+      "bb_per_100": 42.39,
+      "street_ev": {
+        "river": -64.25,
+        "flop": -20.95,
+        "preflop": -69.39,
+        "turn": -98.94
+      },
+      "bucket_ev": {
+        "0": 7.09,
+        "1": -1.16,
+        "2": -0.12,
+        "3": -0.51,
+        "4": 0.54,
+        "5": -0.13,
+        "6": 1.25,
+        "7": -1.56
+      }
+    }
+  },
+  "WeirdSizingBot": {
+    "B0": {
+      "bb_per_100": -641.58,
+      "street_ev": {
+        "preflop": -254.92,
+        "flop": -1579.69,
+        "turn": -1468.17,
+        "river": -1225.16
+      },
+      "action_ev": {
+        "preflop": {
+          "fold": {
+            "total_ev_bb": -1845.1,
+            "count": 1772,
+            "avg_ev_bb": -1.04
+          },
+          "check": {
+            "total_ev_bb": -710.05,
+            "count": 910,
+            "avg_ev_bb": -0.78
+          },
+          "call": {
+            "total_ev_bb": -28318.15,
+            "count": 2794,
+            "avg_ev_bb": -10.14
+          },
+          "bet": {
+            "total_ev_bb": -137.65,
+            "count": 88,
+            "avg_ev_bb": -1.56
+          }
+        },
+        "flop": {
+          "fold": {
+            "total_ev_bb": -2080.3,
+            "count": 594,
+            "avg_ev_bb": -3.5
+          },
+          "check": {
+            "total_ev_bb": -7587.9,
+            "count": 1455,
+            "avg_ev_bb": -5.22
+          },
+          "call": {
+            "total_ev_bb": -9349.2,
+            "count": 333,
+            "avg_ev_bb": -28.08
+          },
+          "bet": {
+            "total_ev_bb": -28135.95,
+            "count": 1309,
+            "avg_ev_bb": -21.49
+          }
+        },
+        "turn": {
+          "fold": {
+            "total_ev_bb": -4485.0,
+            "count": 309,
+            "avg_ev_bb": -14.51
+          },
+          "check": {
+            "total_ev_bb": 856.55,
+            "count": 838,
+            "avg_ev_bb": 1.02
+          },
+          "call": {
+            "total_ev_bb": -1653.85,
+            "count": 196,
+            "avg_ev_bb": -8.44
+          },
+          "bet": {
+            "total_ev_bb": -31022.1,
+            "count": 820,
+            "avg_ev_bb": -37.83
+          }
+        },
+        "river": {
+          "fold": {
+            "total_ev_bb": -5391.3,
+            "count": 146,
+            "avg_ev_bb": -36.93
+          },
+          "check": {
+            "total_ev_bb": -1823.35,
+            "count": 573,
+            "avg_ev_bb": -3.18
+          },
+          "call": {
+            "total_ev_bb": -1912.9,
+            "count": 163,
+            "avg_ev_bb": -11.74
+          },
+          "bet": {
+            "total_ev_bb": -6381.65,
+            "count": 454,
+            "avg_ev_bb": -14.06
+          }
+        }
+      },
+      "bucket_ev": {
+        "0": {
+          "total_ev_bb": -15127.1,
+          "count": 148,
+          "avg_ev_bb": -102.21
+        },
+        "1": {
+          "total_ev_bb": -19280.65,
+          "count": 348,
+          "avg_ev_bb": -55.4
+        },
+        "2": {
+          "total_ev_bb": -21787.15,
+          "count": 861,
+          "avg_ev_bb": -25.3
+        },
+        "3": {
+          "total_ev_bb": -19281.15,
+          "count": 1369,
+          "avg_ev_bb": -14.08
+        },
+        "4": {
+          "total_ev_bb": -6283.9,
+          "count": 1100,
+          "avg_ev_bb": -5.71
+        },
+        "5": {
+          "total_ev_bb": 6403.65,
+          "count": 479,
+          "avg_ev_bb": 13.37
+        },
+        "6": {
+          "total_ev_bb": 13021.2,
+          "count": 390,
+          "avg_ev_bb": 33.39
+        },
+        "7": {
+          "total_ev_bb": 30255.9,
+          "count": 305,
+          "avg_ev_bb": 99.2
+        }
+      },
+      "callstation_dashboard": null,
+      "bridge_pain": {
+        "total_events": 5422,
+        "by_mapped_action": {
+          "open raise": {
+            "count": 2101,
+            "avg_distance": 0.262,
+            "max_distance": 0.384,
+            "concrete_range": [
+              0.5,
+              0.714
+            ],
+            "nominal": 0.33
+          },
+          "bet half pot": {
+            "count": 1042,
+            "avg_distance": 0.187,
+            "max_distance": 0.278,
+            "concrete_range": [
+              0.222,
+              0.34
+            ],
+            "nominal": 0.5
+          },
+          "bet 1/4 pot": {
+            "count": 555,
+            "avg_distance": 0.076,
+            "max_distance": 0.237,
+            "concrete_range": [
+              0.013,
+              0.219
+            ],
+            "nominal": 0.25
+          },
+          "bet 3/4 pot": {
+            "count": 534,
+            "avg_distance": 0.331,
+            "max_distance": 0.425,
+            "concrete_range": [
+              0.325,
+              0.466
+            ],
+            "nominal": 0.75
+          },
+          "bet 2x pot": {
+            "count": 519,
+            "avg_distance": 1.342,
+            "max_distance": 1.426,
+            "concrete_range": [
+              0.574,
+              0.667
+            ],
+            "nominal": 2.0
+          },
+          "overbet 1.25x": {
+            "count": 543,
+            "avg_distance": 0.696,
+            "max_distance": 0.799,
+            "concrete_range": [
+              0.451,
+              0.565
+            ],
+            "nominal": 1.25
+          },
+          "bet 1/3 pot": {
+            "count": 91,
+            "avg_distance": 0.126,
+            "max_distance": 0.148,
+            "concrete_range": [
+              0.182,
+              0.282
+            ],
+            "nominal": 0.33
+          },
+          "3-bet": {
+            "count": 16,
+            "avg_distance": 0.18,
+            "max_distance": 0.278,
+            "concrete_range": [
+              0.222,
+              0.417
+            ],
+            "nominal": 0.5
+          },
+          "4-bet": {
+            "count": 9,
+            "avg_distance": 0.585,
+            "max_distance": 0.63,
+            "concrete_range": [
+              0.04,
+              0.163
+            ],
+            "nominal": 0.67
+          },
+          "bet 2/3 pot": {
+            "count": 6,
+            "avg_distance": 0.281,
+            "max_distance": 0.358,
+            "concrete_range": [
+              0.312,
+              0.412
+            ],
+            "nominal": 0.67
+          },
+          "bet pot": {
+            "count": 6,
+            "avg_distance": 0.519,
+            "max_distance": 0.573,
+            "concrete_range": [
+              0.427,
+              0.5
+            ],
+            "nominal": 1.0
+          }
+        },
+        "by_phase": {
+          "preflop": {
+            "count": 2126,
+            "avg_distance": 0.263
+          },
+          "flop": {
+            "count": 1746,
+            "avg_distance": 0.465
+          },
+          "turn": {
+            "count": 1002,
+            "avg_distance": 0.466
+          },
+          "river": {
+            "count": 548,
+            "avg_distance": 0.414
+          }
+        },
+        "worst_gaps": [
+          {
+            "concrete_ratio": 0.574,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.426,
+            "phase": "flop",
+            "bucket": 56
+          },
+          {
+            "concrete_ratio": 0.577,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.423,
+            "phase": "turn",
+            "bucket": 102
+          },
+          {
+            "concrete_ratio": 0.577,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.423,
+            "phase": "river",
+            "bucket": 118
+          },
+          {
+            "concrete_ratio": 0.577,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.423,
+            "phase": "flop",
+            "bucket": 48
+          },
+          {
+            "concrete_ratio": 0.577,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.423,
+            "phase": "flop",
+            "bucket": 103
+          },
+          {
+            "concrete_ratio": 0.577,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.423,
+            "phase": "flop",
+            "bucket": 64
+          },
+          {
+            "concrete_ratio": 0.577,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.423,
+            "phase": "flop",
+            "bucket": 117
+          },
+          {
+            "concrete_ratio": 0.579,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.421,
+            "phase": "turn",
+            "bucket": 96
+          },
+          {
+            "concrete_ratio": 0.581,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.419,
+            "phase": "flop",
+            "bucket": 44
+          },
+          {
+            "concrete_ratio": 0.582,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.418,
+            "phase": "flop",
+            "bucket": 89
+          }
+        ]
+      }
+    },
+    "v7": {
+      "bb_per_100": -628.02,
+      "street_ev": {
+        "preflop": -263.67,
+        "flop": -1731.46,
+        "turn": -1706.45,
+        "river": -1240.0
+      },
+      "action_ev": {
+        "preflop": {
+          "fold": {
+            "total_ev_bb": -1752.3,
+            "count": 1736,
+            "avg_ev_bb": -1.01
+          },
+          "check": {
+            "total_ev_bb": 2676.2,
+            "count": 900,
+            "avg_ev_bb": 2.97
+          },
+          "call": {
+            "total_ev_bb": -28683.75,
+            "count": 2794,
+            "avg_ev_bb": -10.27
+          },
+          "bet": {
+            "total_ev_bb": -1049.35,
+            "count": 80,
+            "avg_ev_bb": -13.12
+          }
+        },
+        "flop": {
+          "fold": {
+            "total_ev_bb": -1741.45,
+            "count": 528,
+            "avg_ev_bb": -3.3
+          },
+          "check": {
+            "total_ev_bb": -5212.0,
+            "count": 1326,
+            "avg_ev_bb": -3.93
+          },
+          "call": {
+            "total_ev_bb": -138.7,
+            "count": 331,
+            "avg_ev_bb": -0.42
+          },
+          "bet": {
+            "total_ev_bb": -24075.0,
+            "count": 1401,
+            "avg_ev_bb": -17.18
+          }
+        },
+        "turn": {
+          "fold": {
+            "total_ev_bb": -4243.15,
+            "count": 292,
+            "avg_ev_bb": -14.53
+          },
+          "check": {
+            "total_ev_bb": -3433.0,
+            "count": 800,
+            "avg_ev_bb": -4.29
+          },
+          "call": {
+            "total_ev_bb": -3915.45,
+            "count": 200,
+            "avg_ev_bb": -19.58
+          },
+          "bet": {
+            "total_ev_bb": -24761.05,
+            "count": 877,
+            "avg_ev_bb": -28.23
+          }
+        },
+        "river": {
+          "fold": {
+            "total_ev_bb": -5172.75,
+            "count": 141,
+            "avg_ev_bb": -36.69
+          },
+          "check": {
+            "total_ev_bb": -3534.45,
+            "count": 514,
+            "avg_ev_bb": -6.88
+          },
+          "call": {
+            "total_ev_bb": -17.0,
+            "count": 158,
+            "avg_ev_bb": -0.11
+          },
+          "bet": {
+            "total_ev_bb": -5074.0,
+            "count": 497,
+            "avg_ev_bb": -10.21
+          }
+        }
+      },
+      "bucket_ev": {
+        "0": {
+          "total_ev_bb": -14690.25,
+          "count": 166,
+          "avg_ev_bb": -88.5
+        },
+        "1": {
+          "total_ev_bb": -20285.45,
+          "count": 339,
+          "avg_ev_bb": -59.84
+        },
+        "2": {
+          "total_ev_bb": -14453.55,
+          "count": 818,
+          "avg_ev_bb": -17.67
+        },
+        "3": {
+          "total_ev_bb": -19205.7,
+          "count": 1363,
+          "avg_ev_bb": -14.09
+        },
+        "4": {
+          "total_ev_bb": -6747.7,
+          "count": 1120,
+          "avg_ev_bb": -6.02
+        },
+        "5": {
+          "total_ev_bb": 642.85,
+          "count": 484,
+          "avg_ev_bb": 1.33
+        },
+        "6": {
+          "total_ev_bb": 12515.4,
+          "count": 377,
+          "avg_ev_bb": 33.2
+        },
+        "7": {
+          "total_ev_bb": 30823.4,
+          "count": 333,
+          "avg_ev_bb": 92.56
+        }
+      },
+      "callstation_dashboard": null,
+      "bridge_pain": {
+        "total_events": 5403,
+        "by_mapped_action": {
+          "open raise": {
+            "count": 2070,
+            "avg_distance": 0.264,
+            "max_distance": 0.384,
+            "concrete_range": [
+              0.5,
+              0.714
+            ],
+            "nominal": 0.33
+          },
+          "bet half pot": {
+            "count": 1015,
+            "avg_distance": 0.188,
+            "max_distance": 0.274,
+            "concrete_range": [
+              0.226,
+              0.359
+            ],
+            "nominal": 0.5
+          },
+          "bet 1/4 pot": {
+            "count": 571,
+            "avg_distance": 0.079,
+            "max_distance": 0.245,
+            "concrete_range": [
+              0.005,
+              0.219
+            ],
+            "nominal": 0.25
+          },
+          "bet 3/4 pot": {
+            "count": 572,
+            "avg_distance": 0.332,
+            "max_distance": 0.42,
+            "concrete_range": [
+              0.33,
+              0.451
+            ],
+            "nominal": 0.75
+          },
+          "bet 2x pot": {
+            "count": 523,
+            "avg_distance": 1.344,
+            "max_distance": 1.432,
+            "concrete_range": [
+              0.568,
+              0.667
+            ],
+            "nominal": 2.0
+          },
+          "overbet 1.25x": {
+            "count": 515,
+            "avg_distance": 0.696,
+            "max_distance": 0.791,
+            "concrete_range": [
+              0.459,
+              0.565
+            ],
+            "nominal": 1.25
+          },
+          "bet 1/3 pot": {
+            "count": 104,
+            "avg_distance": 0.127,
+            "max_distance": 0.15,
+            "concrete_range": [
+              0.18,
+              0.282
+            ],
+            "nominal": 0.33
+          },
+          "3-bet": {
+            "count": 16,
+            "avg_distance": 0.186,
+            "max_distance": 0.278,
+            "concrete_range": [
+              0.222,
+              0.417
+            ],
+            "nominal": 0.5
+          },
+          "4-bet": {
+            "count": 7,
+            "avg_distance": 0.568,
+            "max_distance": 0.63,
+            "concrete_range": [
+              0.04,
+              0.172
+            ],
+            "nominal": 0.67
+          },
+          "bet pot": {
+            "count": 4,
+            "avg_distance": 0.522,
+            "max_distance": 0.533,
+            "concrete_range": [
+              0.467,
+              0.491
+            ],
+            "nominal": 1.0
+          },
+          "bet 2/3 pot": {
+            "count": 6,
+            "avg_distance": 0.309,
+            "max_distance": 0.366,
+            "concrete_range": [
+              0.304,
+              0.389
+            ],
+            "nominal": 0.67
+          }
+        },
+        "by_phase": {
+          "preflop": {
+            "count": 2093,
+            "avg_distance": 0.264
+          },
+          "flop": {
+            "count": 1682,
+            "avg_distance": 0.474
+          },
+          "turn": {
+            "count": 1070,
+            "avg_distance": 0.439
+          },
+          "river": {
+            "count": 558,
+            "avg_distance": 0.425
+          }
+        },
+        "worst_gaps": [
+          {
+            "concrete_ratio": 0.568,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.432,
+            "phase": "flop",
+            "bucket": 104
+          },
+          {
+            "concrete_ratio": 0.57,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.43,
+            "phase": "turn",
+            "bucket": 116
+          },
+          {
+            "concrete_ratio": 0.57,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.43,
+            "phase": "river",
+            "bucket": 71
+          },
+          {
+            "concrete_ratio": 0.57,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.43,
+            "phase": "flop",
+            "bucket": 103
+          },
+          {
+            "concrete_ratio": 0.571,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.429,
+            "phase": "river",
+            "bucket": 110
+          },
+          {
+            "concrete_ratio": 0.573,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.427,
+            "phase": "flop",
+            "bucket": 65
+          },
+          {
+            "concrete_ratio": 0.574,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.426,
+            "phase": "flop",
+            "bucket": 56
+          },
+          {
+            "concrete_ratio": 0.574,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.426,
+            "phase": "flop",
+            "bucket": 59
+          },
+          {
+            "concrete_ratio": 0.576,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.424,
+            "phase": "turn",
+            "bucket": 70
+          },
+          {
+            "concrete_ratio": 0.577,
+            "mapped_action": 15,
+            "mapped_name": "bet 2x pot",
+            "nominal_ratio": 2.0,
+            "distance": 1.423,
+            "phase": "flop",
+            "bucket": 44
+          }
+        ]
+      }
+    },
+    "delta": {
+      "bb_per_100": -13.56,
+      "street_ev": {
+        "river": 14.84,
+        "flop": 151.77,
+        "preflop": 8.75,
+        "turn": 238.28
+      },
+      "bucket_ev": {
+        "0": -13.71,
+        "1": 4.44,
+        "2": -7.63,
+        "3": 0.01,
+        "4": 0.31,
+        "5": 12.04,
+        "6": 0.19,
+        "7": 6.64
+      }
+    }
+  }
+}

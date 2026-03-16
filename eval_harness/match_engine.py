@@ -153,7 +153,7 @@ class GTOAgent(Agent):
                 strategy[int(Action.CHECK_CALL)] += boost
 
         # Apply blend mapping: mix trained strategy with equity heuristic
-        if self.mapping == "blend":
+        if self.mapping in ("blend", "confidence_nearest"):
             from eval_harness.confidence import (
                 compute_confidence, equity_heuristic, blend_strategies)
             eq_bucket, _ = decode_bucket(bucket)
@@ -162,13 +162,20 @@ class GTOAgent(Agent):
             visit_count = float(node.strategy_sum.sum()) if node else 0.0
             # Compute concrete bet ratio if opponent bet
             concrete_bet_ratio = None
+            mapped_action_id = None
             if ctx.current_bet > ctx.my_bet and ctx.pot > 0:
                 concrete_bet_ratio = (ctx.current_bet - ctx.my_bet) / ctx.pot
+                if history:
+                    mapped_action_id = int(history[-1])
             alpha = compute_confidence(strategy, visit_count,
                                        concrete_bet_ratio=concrete_bet_ratio,
-                                       mapped_action=None)
-            heuristic = equity_heuristic(eq_bucket, has_bet, ctx.phase)
-            strategy = blend_strategies(strategy, heuristic, alpha)
+                                       mapped_action=mapped_action_id)
+            # For confidence_nearest: only apply when mismatch is significant
+            if self.mapping == "confidence_nearest" and alpha < 0.05:
+                pass  # Skip blending for small mismatches
+            else:
+                heuristic = equity_heuristic(eq_bucket, has_bet, ctx.phase)
+                strategy = blend_strategies(strategy, heuristic, alpha)
 
         # Apply opponent-adaptive adjustments (EQ0-3 bluff nodes only)
         if self.opponent_profile is not None:

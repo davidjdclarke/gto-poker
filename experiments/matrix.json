@@ -699,5 +699,33 @@
       "frequency_anomalies": 2643
     },
     "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260315_103942_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260315_145744",
+    "timestamp": "2026-03-15T14:58:02",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1998352,
+      "train_time_s": 9148.6,
+      "ms_per_iteration": 0.09,
+      "exploitability_mean": 128.2382,
+      "exploitability_std": 1.299,
+      "exploitability_preflop": 153.7884
+    },
+    "audit_counts": {
+      "premium_limp": 6,
+      "allin_overuse": 120,
+      "flat_strategies": 3667,
+      "frequency_anomalies": 46653
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260315_145744_strategy.json"
   }
 ]

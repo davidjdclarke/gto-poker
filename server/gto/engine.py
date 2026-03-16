@@ -49,6 +49,10 @@ def get_trainer() -> CFRTrainer:
             _trainer.train(num_iterations=5000, sampling='external')
             _trainer.save(STRATEGY_FILE)
             logger.info("Training complete.")
+        # Auto-detect and set action grid from loaded strategy
+        from server.gto.abstraction import detect_action_grid_from_strategy, set_action_grid
+        grid = detect_action_grid_from_strategy(_trainer)
+        set_action_grid(grid)
     return _trainer
 
 
