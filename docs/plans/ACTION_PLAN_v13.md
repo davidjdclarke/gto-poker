@@ -1,7 +1,7 @@
 # V13 Action Plan — GTO Solver
 
 **Date:** 2026-03-16
-**Status:** Draft
+**Status:** Final
 **Scope:** Breaking through the 1.22 bb/100 abstraction ceiling
 
 ---
@@ -32,7 +32,9 @@ The v12 head-to-head (50k hands, 3 seeds) confirmed the strategic symptoms:
 - River value betting frequency: poly2+refine bets 16% vs B0's 22.9% — consistent with
   a strategy that cannot distinguish "strong made hand" from "missed draw" within a bucket
 
-V13 must therefore focus on the abstraction itself, not the training algorithm.
+V13 must focus primarily on the abstraction, but the paper research also surfaced two
+near-drop-in training algorithm improvements (PCFR+ and hyperparameter schedules) that
+could push exploitability lower before any abstraction work is done.
 
 ---
 
@@ -40,13 +42,13 @@ V13 must therefore focus on the abstraction itself, not the training algorithm.
 
 V13 has four goals in priority order:
 
-1. **Improve the runtime bridge without retraining** — extract more performance from B0
-   using better action translation theory and safer subgame solving
-2. **Improve the B0 blueprint via targeted retraining** — VR-MCCFR variance reduction
-   and suit isomorphism to get more out of the same node budget
+1. **Improve the runtime bridge without retraining** — pseudo-harmonic action translation,
+   safe subgame solving (Refine 3.0), per-opponent AIVAT calibration
+2. **Improve the B0 blueprint via targeted retraining** — PCFR+ optimistic updates,
+   VR-MCCFR variance reduction, hyperparameter schedules, and suit isomorphism
 3. **Redesign the card abstraction** — potential-aware EMD bucketing to replace E[HS²]
    single-number bucketing with distribution-aware clustering; board texture as key
-   dimension
+   dimension; Embedding CFR as an alternative to discrete buckets entirely
 4. **Research track: dynamic action abstraction** — prototype RL-CFR to learn which
    bet sizes belong at each node, rather than using a fixed grid
 
@@ -58,21 +60,56 @@ These papers inform specific workstreams below. All have been confirmed and revi
 
 | Paper | Year | Venue | Relevance |
 |-------|------|-------|-----------|
-| Ganzfried & Sandholm — "Action Translation: Pseudo-Harmonic Mapping" | 2013 | IJCAI | Theoretically sound action translation replacing nearest/confidence |
-| Waugh — "A Fast and Optimal Hand Isomorphism Algorithm" | 2013 | CMU | Lossless suit canonicalization, postflop board-relative |
+**Card / Information Abstraction**
+
+| Paper | Year | Venue | Relevance |
+|-------|------|-------|-----------|
 | Ganzfried & Sandholm — "Potential-Aware Imperfect-Recall Abstraction with EMD" | 2014 | AAAI | EMD-based equity trajectory clustering; directly attacks abstraction ceiling |
-| Tammelin — "Solving Large Imperfect Information Games Using CFR+" | 2014 | arXiv | Foundation; verify alternating-update property in parallel workers |
-| Brown & Sandholm — "Safe and Nested Subgame Solving" | 2017 | NeurIPS (Best Paper) | Makes local_refine.py theoretically safe; gift-action construction |
-| Brown, Sandholm, Amos — "Depth-Limited Solving for Imperfect Information Games" | 2018 | NeurIPS | K=2 leaf strategies in subgame; Modicum architecture |
-| Brown et al. — "Combining Deep RL and Search: ReBeL" | 2020 | NeurIPS | PBS value network — learned terminal evaluator for refine |
+| Fu et al. — "Signal Observation Models and Historical Information Integration" (KrwEmd) | 2024 | arXiv | k-recall winrate features with EMD; encodes board runout history in bucket; proves information loss in imperfect-recall schemes |
+| Fu et al. — "Beyond Outcome-Based Imperfect-Recall" | 2025 | arXiv | Proves standard outcome-based bucketing "suffers substantial losses by discarding history"; constructive framework for higher-resolution abstractions |
+| Fu et al. — "No-Regret Strategy Solving via Pre-Trained Embedding" (Embedding CFR) | 2026 | AAAI 2026 | Replaces discrete 120-bucket scheme with continuous learned embeddings; regret generalizes across similar infosets without hard clustering |
+| Waugh — "A Fast and Optimal Hand Isomorphism Algorithm" | 2013 | CMU | Lossless suit canonicalization, postflop board-relative |
+
+**Action Translation**
+
+| Paper | Year | Venue | Relevance |
+|-------|------|-------|-----------|
+| Ganzfried & Sandholm — "Action Translation: Pseudo-Harmonic Mapping" | 2013 | IJCAI | Provably less exploitable than nearest/confidence; axiomatically derived formula |
+| Li, Fang, Huang — "RL-CFR: Dynamic Action Abstraction" | 2024 | ICML | Learns context-specific action menus via RL; beats Slumbot by 84 mbb/h |
+
+**Subgame Solving**
+
+| Paper | Year | Venue | Relevance |
+|-------|------|-------|-----------|
+| Brown & Sandholm — "Safe and Nested Subgame Solving" | 2017 | NeurIPS (Best Paper) | Gift-action construction makes local_refine.py theoretically safe |
+| Brown, Sandholm, Amos — "Depth-Limited Solving / Modicum" | 2018 | NeurIPS | K=2 leaf strategies; blueprint as value function |
+| Zhou et al. — "DecisionHoldem: Safe Depth-Limited Solving with Diverse Opponents" | 2022 | arXiv | Open-source blueprint+subgame; beats Slumbot by 730 mbb/h; direct reference implementation |
+| Kubíček, Lisý, Sandholm — "Equilibrium Refinements Improve Subgame Solving" | 2026 | arXiv | Sequential equilibria gadgets reduce exploitability >50% vs standard subgame solving |
+| Ge et al. — "Safe and Robust Subgame Exploitation" | 2024 | ICML | Safety guarantees + opponent exploitation simultaneously |
+
+**CFR Algorithm Improvements**
+
+| Paper | Year | Venue | Relevance |
+|-------|------|-------|-----------|
+| Tammelin — "Solving Large Imperfect Information Games Using CFR+" | 2014 | arXiv | Foundation algorithm currently in use |
 | Schmid et al. — "VR-MCCFR" | 2019 | AAAI | Baseline variance reduction in external sampling (~1000× lower variance) |
-| Li, Fang, Huang — "RL-CFR: Dynamic Action Abstraction" | 2024 | ICML | Learns which actions to include per node via RL; beats Slumbot by 84 mbb/h |
-| Anon — "Signal Observation Models / KrwEmd" | 2024–25 | arXiv | Historical information in bucketing; preflop history fingerprint in flop key |
+| Brown & Sandholm — "DCFR: Discounted Regret Minimization" | 2019 | AAAI | Asymmetric α/β discounting (not yet tested); different from symmetric version in v10 sweep |
+| Farina, Kroer, Sandholm — "Optimistic CFR / PCFR+" | 2020 | NeurIPS | T⁻¹ convergence (vs CFR+'s T⁻¹/²); near-drop-in Cython replacement for the regret update |
+| Zhang, McAleer, Sandholm — "Faster Game Solving via Hyperparameter Schedules" | 2026 | AAAI 2026 | Automated CFR discounting schedule; 10–30% faster convergence validated on large poker |
+| McAleer et al. — "ESCHER" | 2022 | NeurIPS workshop | History value function eliminates importance sampling; orders-of-magnitude variance reduction |
+
+**Deep / Neural Approaches (research track)**
+
+| Paper | Year | Venue | Relevance |
+|-------|------|-------|-----------|
+| Brown & Sandholm — "ReBeL" | 2020 | NeurIPS | PBS value network as learned terminal evaluator; open source |
+| Brown et al. — "Deep CFR" | 2019 | ICML | Replaces discrete abstraction with neural CFR; removes ceiling by definition |
 
 **Open-source reference implementations:**
 - `ericgjackson/slumbot2019` — production-scale HUNL, no postflop card abstraction (the target to beat)
 - `lbn187/RL-CFR` — ICML 2024 dynamic action abstraction, Python
-- `AI-Decision/DecisionHoldem` — blueprint + safe depth-limited subgame solving, Python
+- `AI-Decision/DecisionHoldem` — blueprint + safe depth-limited subgame solving, Python (2022 SOTA open-source HUNL)
+- `facebookresearch/rebel` — full ReBeL implementation (C++/Python)
 - `kdub0/hand-isomorphism` — C library for lossless suit canonicalization
 
 ---
@@ -162,6 +199,15 @@ Then max over these two leaf values when choosing our action.
    100 to 200 — theoretically safe refinements can fire more often without degrading the
    overall strategy.
 
+**Additional reference: Kubíček et al. (2026)** proved that using sequential equilibria
+(rather than Nash) as the subgame solution concept reduces the exploitability of the full
+strategy by >50% compared to standard subgame solving. If WS1 is implemented, testing
+sequential equilibria as the subgame objective is a natural follow-on experiment.
+
+**Reference implementation: DecisionHoldem** (`github.com/AI-Decision/DecisionHoldem`) —
+open-source Python, beat Slumbot by 730 mbb/h using this exact architecture. Study its
+`subgame_solver.py` before implementing WS1.
+
 **Success criteria:**
 - Refine 3.0 beats Refine 2.0 on WeirdSizingBot (target: +50)
 - PerturbBot regression eliminated (was a known Refine 2.0 weakness)
@@ -171,7 +217,47 @@ Then max over these two leaf values when choosing our action.
 
 ---
 
-### WS2 — VR-MCCFR: Variance Reduction in Training
+### WS2a — PCFR+: Optimistic Regret Updates (near-drop-in Cython change)
+
+**Goal:** Replace the CFR+ regret update in `cfr_fast.pyx` with an optimistic / predictive
+variant (PCFR+) that achieves T⁻¹ convergence instead of CFR+'s T⁻¹/².
+
+**Background:** Farina, Kroer & Sandholm (NeurIPS 2020) showed that adding a predictive
+(optimistic) correction term to regret minimization changes convergence from T⁻¹/² to T⁻¹
+— the same improvement rate as going from vanilla gradient descent to Nesterov acceleration.
+The update is:
+
+```
+# CFR+:
+R[t+1](a) = max(R[t](a) + r[t](a), 0)
+
+# PCFR+ (optimistic):
+r̂[t](a) = r[t-1](a)                        # prediction: last iteration's regret
+R[t+1](a) = max(R[t](a) + r[t](a) - r̂[t](a), 0)
+```
+
+The optimistic term `r̂[t](a)` is the previous iteration's counterfactual regret, which
+requires storing one extra `double[16]` array per node (the "prediction buffer").
+
+**Why this matters for your plateau:** The theoretical improvement is most pronounced at
+lower iteration counts. If your 100M-iteration convergence is limited by CFR+'s T⁻¹/²
+rate, PCFR+ could reach the same exploitability in ~50M iterations, or push below
+1.22 bb/100 by 100M. Combined with WS2b (VR-MCCFR baselines), this is a multiplicative
+improvement in effective convergence speed.
+
+**Cython changes:** Add `double prev_regret[16]` field to `NodeData` struct; update
+inner loop to compute the prediction correction; add `--solver pcfr+` flag to
+`train_gto.py`.
+
+**Success criteria:**
+- Exploitability at 50M iterations < 1.22 bb/100 (current 100M baseline)
+- No regression in gauntlet or H2H
+
+**Estimated effort:** 12–16 hours
+
+---
+
+### WS2b — VR-MCCFR: Variance Reduction in Training
 
 **Goal:** Add a baseline function to the external sampling MCCFR traversal to reduce
 regret estimate variance by ~1000×, enabling faster convergence per iteration.
@@ -216,6 +302,45 @@ masking additional strategy refinement.
 - No regression in gauntlet (same strategy quality faster)
 
 **Estimated effort:** 10–14 hours
+
+---
+
+### WS2c — Hyperparameter Schedules for CFR Discounting
+
+**Goal:** Replace the hand-tuned `--weight-schedule` and `--regret-discount` flags with
+an automatically derived schedule validated on large-scale poker.
+
+**Background:** Zhang, McAleer & Sandholm (AAAI 2026) showed that a single time-varying
+CFR discounting schedule derived from three small benchmark games generalises to 17 diverse
+games including large-scale HUNL. Their schedule aggressively discounts early iterations
+and gradually stabilises. Empirically 10–30% faster convergence than CFR+ or DCFR with
+fixed schedules.
+
+The schedule is parameterised as:
+```
+discount[t] = t^α / (t^α + c)     # α and c derived from small-game sweep
+weight[t]   = t^β                  # strategy weight
+```
+
+where α, β, c are found by grid search on Kuhn/Leduc/Goofspiel — your `run_toy_validation.py`
+already provides the Kuhn poker test bed.
+
+**Implementation:**
+
+1. Run the schedule sweep on Kuhn poker (10k iterations) to find α, β, c
+2. Add `--weight-schedule zhang2026 --weight-param α,β,c` to `train_gto.py`
+3. Train B0-schedule (100M iterations) and compare exploitability to B0
+
+**Why this is a quick win:** It requires zero architectural changes. If the Zhang schedule
+outperforms your current linear weighting, retrain B0 with it at no additional cost.
+Your `--weight-schedule scheduled` mode in v11 was an approximation; the Zhang 2026
+calibration is the proper derivation.
+
+**Success criteria:**
+- Exploitability with Zhang schedule < 1.15 bb/100 at 100M iterations
+- Validated first on Kuhn poker (reduces risk before full training run)
+
+**Estimated effort:** 6–8 hours
 
 ---
 
@@ -408,6 +533,38 @@ Option B — Python dict with 128-bit key (fallback):
 
 ---
 
+### WS5b — Embedding CFR: Continuous Infoset Representations (Research Track)
+
+**Goal:** Evaluate replacing the discrete 120-bucket scheme with pre-trained continuous
+embeddings, per Fu et al. (AAAI 2026), as an alternative to the WS4 + WS5 retrain.
+
+**Background:** Fu et al. (AAAI 2026) showed that replacing the hard cluster assignment
+`bucket = equity_bucket × 15 + hand_type` with a continuous embedding where regret
+accumulation generalises across nearby infosets achieves better exploitability per node
+than discrete bucketing. The embedding is trained from game play data (infoset features →
+low-dimensional vector) and used to define "soft" bucket membership.
+
+This is the most architecturally different approach in the plan. It eliminates the
+bucketing ceiling by definition — there are no hard bucket boundaries to exploit. However
+it requires:
+- A training pipeline for the embedding network (offline, using existing strategy data)
+- Modification of CFR to accumulate regrets in embedding space rather than per-bucket
+- Significant departure from the current tabular architecture
+
+**Prototype scope for v13:**
+1. Train a simple MLP embedding on (hole_cards, board, phase) → 16-dimensional vector
+   using the existing `hand_strength_bucket` outputs as supervision
+2. Implement a "soft bucket" version of `get_strategy()` that interpolates between the
+   K nearest cluster centers rather than doing a hard lookup
+3. Measure exploitability and gauntlet vs. hard-bucket baseline
+
+This is explicitly a research track — if the prototype shows improvement at 10M
+iterations, it becomes a Phase D workstream. If not, discard.
+
+**Estimated effort:** 20–30 hours
+
+---
+
 ### WS6 — RL-CFR Dynamic Action Abstraction (Research Track)
 
 **Goal:** Prototype RL-CFR (Li et al., ICML 2024) using the existing `add_selective_action()`
@@ -546,22 +703,25 @@ V13 should proceed in three phases:
 3. **WS8:** Slumbot evaluation — external validation before major investment
 4. Board texture wired into `confidence_nearest` — low effort, free improvement
 
-### Phase B — Improved blueprint via smarter retraining (4–6 weeks)
+### Phase B — Improved blueprint via smarter retraining (4–8 weeks)
 
-5. **WS2:** VR-MCCFR implementation in `cfr_fast.pyx`
-6. **WS3:** Suit isomorphism canonicalization
-7. **B0-v2 retrain:** B0 with VR-MCCFR + suit isomorphism
-8. **WS1:** Refine 3.0 (safe subgame solving + K=2 leaves) against B0-v2
+5. **WS2c:** Zhang 2026 hyperparameter schedule sweep on Kuhn poker (1–2 days)
+6. **WS2a:** PCFR+ optimistic regret update in `cfr_fast.pyx`
+7. **WS2b:** VR-MCCFR baseline variance reduction in `cfr_fast.pyx`
+8. **WS3:** Suit isomorphism canonicalization
+9. **B0-v2 retrain:** B0 with PCFR+ + VR-MCCFR + suit isomorphism + Zhang schedule
+10. **WS1:** Refine 3.0 (safe subgame solving + K=2 leaves) against B0-v2
 
-**Gate:** B0-v2 must beat current B0 in H2H before proceeding to the abstraction redesign.
-If B0-v2 does not improve, the problem is confirmed to be abstraction-only (not solver
-variance) and we proceed directly to Phase C.
+**Gate:** B0-v2 must beat current B0 in H2H before proceeding to Phase C. The PCFR+ and
+Zhang schedule changes together should be sufficient to move exploitability — if neither
+moves the needle, the ceiling is confirmed as abstraction-only and we skip to Phase C.
 
 ### Phase C — Abstraction redesign (8–12 weeks)
 
-9. **WS4:** Potential-aware EMD bucketing (precompute histograms, cluster, retrain)
-10. **WS5:** Board texture as key dimension (implement after WS4 converges)
-11. **WS6:** RL-CFR prototype (research track, can run in parallel with WS5)
+11. **WS4:** Potential-aware EMD bucketing (precompute histograms, cluster, retrain)
+12. **WS5:** Board texture as key dimension (implement after WS4 converges)
+13. **WS5b:** Embedding CFR prototype (in parallel with WS5, research track)
+14. **WS6:** RL-CFR dynamic action abstraction (in parallel, research track)
 
 ---
 
@@ -569,14 +729,15 @@ variance) and we proceed directly to Phase C.
 
 V13 should be considered successful if it achieves **at least two** of the following:
 
-| Criterion | Target | Current |
-|-----------|--------|---------|
-| Exploitability (best model) | < 0.80 bb/100 | 1.22 (B0) |
-| H2H B0-v2 vs B0 | B0-v2 wins significantly | — |
-| WeirdSizingBot (best mapping) | > +80 bb/100 | +32.7 (poly2+refine) |
-| OOP deficit in H2H | < −500 bb/100 | −1,147 (poly2 vs B0) |
-| Slumbot | > 0 bb/100 | unknown |
-| AIVAT variance reduction | ≥ 3× vs raw | currently inflates |
+| Criterion | Target | Current | Primary WS |
+|-----------|--------|---------|-----------|
+| Exploitability (best model) | < 0.80 bb/100 | 1.22 (B0) | WS2a/b/c, WS4 |
+| H2H B0-v2 vs B0 | B0-v2 wins significantly | — | WS2a/b/c + WS3 |
+| WeirdSizingBot (best mapping) | > +80 bb/100 | +32.7 (poly2+refine) | WS0, WS1 |
+| OOP deficit in H2H | < −500 bb/100 | −1,147 (poly2 vs B0) | WS4, WS5 |
+| Slumbot | > 0 bb/100 | unknown | WS8 |
+| AIVAT variance reduction | ≥ 3× vs raw | currently inflates | WS7 |
+| Refine 3.0 vs Refine 2.0 on PerturbBot | no regression | −215 bb/100 | WS1 |
 
 ---
 
@@ -616,7 +777,9 @@ The following were considered and explicitly excluded:
 | `eval_harness/match_engine.py` | Add `pseudo_harmonic` mapping to `GTOAgent` | WS0 |
 | `server/gto/abstraction.py` | Add `pseudo_harmonic_translate()` function | WS0 |
 | `server/gto/local_refine.py` | Gift action + K=2 leaves (Refine 3.0) | WS1 |
-| `server/gto/cfr_fast.pyx` | VR-MCCFR baseline in inner loop | WS2 |
+| `server/gto/cfr_fast.pyx` | PCFR+ prev_regret buffer + optimistic update | WS2a |
+| `server/gto/cfr_fast.pyx` | VR-MCCFR baseline in inner loop | WS2b |
+| `train_gto.py` | `--solver pcfr+` flag, Zhang 2026 schedule mode | WS2a, WS2c |
 | `server/gto/equity.py` | `canonicalize_hand_board()` + EMD lookup table | WS3, WS4 |
 | `server/gto/abstraction.py` | Infoset key + texture dimension | WS5 |
 | `server/gto/cfr_fast.pyx` | Updated key encoding for texture | WS5 |
@@ -631,14 +794,20 @@ The following were considered and explicitly excluded:
 
 For anyone starting fresh on v13 implementation, read in this order:
 
-1. **Brown & Sandholm 2017 (Safe and Nested Subgame Solving)** — understand why safe
-   subgame solving matters before touching `local_refine.py`
-2. **Ganzfried & Sandholm 2013 (Pseudo-Harmonic Mapping)** — understand the action
-   translation theory before implementing WS0
-3. **Ganzfried & Sandholm 2014 (Potential-Aware EMD)** — understand what "potential-aware"
-   means and why E[HS²] has a theoretical ceiling before starting WS4
-4. **Li et al. 2024 (RL-CFR)** — read the GitHub before starting WS6
-5. **Schmid et al. 2019 (VR-MCCFR)** — understand the baseline construction before
-   touching `cfr_fast.pyx`
-6. **Waugh 2013 (Hand Isomorphism)** — study the `kdub0/hand-isomorphism` C code before
-   implementing WS3
+1. **Ganzfried & Sandholm 2013 (Pseudo-Harmonic Mapping)** — understand action translation
+   theory before implementing WS0; 30-minute read, immediate payoff
+2. **Brown & Sandholm 2017 (Safe and Nested Subgame Solving)** — understand the gift-action
+   construction before touching `local_refine.py`; read `AI-Decision/DecisionHoldem` source
+   alongside
+3. **Farina, Kroer & Sandholm 2020 (PCFR+/Optimistic CFR)** — understand the prediction
+   buffer before touching `cfr_fast.pyx` for WS2a
+4. **Zhang, McAleer & Sandholm 2026 (Hyperparameter Schedules)** — read before running
+   WS2c; the small-game sweep methodology translates directly to `run_toy_validation.py`
+5. **Schmid et al. 2019 (VR-MCCFR)** — understand the baseline construction for WS2b
+6. **Ganzfried & Sandholm 2014 (Potential-Aware EMD)** — understand equity trajectory
+   clustering before starting WS4
+7. **Fu et al. 2024 (KrwEmd / Signal Observation Models)** — read alongside WS4 to
+   understand the theoretical ceiling on imperfect-recall bucketing
+8. **Waugh 2013 (Hand Isomorphism)** — study `kdub0/hand-isomorphism` C code before WS3
+9. **Li et al. 2024 (RL-CFR)** — read the GitHub (`lbn187/RL-CFR`) before WS6
+10. **Fu et al. 2026 (Embedding CFR)** — read before WS5b prototype
