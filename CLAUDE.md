@@ -468,7 +468,8 @@ Existing results:
 **Before starting a new improvement cycle, create an action plan in `docs/plans/`** describing the goals, hypotheses, and planned changes. Update the plan as work progresses. This provides a decision log for why changes were made.
 
 Existing plans:
-- `docs/plans/ACTION_PLAN_v12.md` — v12 research plan (current)
+- `docs/plans/ACTION_PLAN_v13.md` — **v13 research plan (current)**: pseudo-harmonic mapping, safe subgame solving, VR-MCCFR, suit isomorphism, EMD bucketing, board texture key dimension
+- `docs/plans/ACTION_PLAN_v12.md` — v12 research plan (complete)
 - `docs/plans/ACTION_PLAN_v11.md` — v11 research plan (complete)
 - `docs/plans/ACTION_PLAN_v10.md` — v10 research plan
 - `docs/plans/ACTION_PLAN_v9.md` — v9 improvement plan
