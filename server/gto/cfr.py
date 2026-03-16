@@ -959,8 +959,9 @@ class CFRTrainer:
         if key in self.nodes:
             node = self.nodes[key]
             avg_strategy = node.get_average_strategy()
+            n = min(len(actions), len(avg_strategy))
             return {int(actions[i]): float(avg_strategy[i])
-                    for i in range(len(actions))}
+                    for i in range(n)}
 
         uniform = 1.0 / len(actions)
         return {int(a): uniform for a in actions}

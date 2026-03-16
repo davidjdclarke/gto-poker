@@ -368,6 +368,16 @@ def _to_concrete_action(abstract_action: Action, player: Player,
             return _fallback_action(to_call, strategy_info)
         return GTODecision("raise", total, strategy_info)
 
+    elif abstract_action == Action.BET_TRIPLE_POT:
+        if player.chips <= to_call:
+            return GTODecision("call", 0, strategy_info)
+        raise_amount = max(min_raise, pot * 3)
+        total = current_bet + raise_amount
+        total = min(total, player.current_bet + player.chips)
+        if total <= current_bet:
+            return _fallback_action(to_call, strategy_info)
+        return GTODecision("raise", total, strategy_info)
+
     elif abstract_action == Action.DONK_SMALL:
         if player.chips <= to_call:
             return GTODecision("call", 0, strategy_info)

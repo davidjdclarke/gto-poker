@@ -34,6 +34,7 @@ ABSTRACT_BET_SIZES = {
     int(Action.BET_POT): 1.00,
     int(Action.BET_OVERBET): 1.25,
     int(Action.BET_DOUBLE_POT): 2.00,
+    int(Action.BET_TRIPLE_POT): 3.00,
     int(Action.DONK_SMALL): 0.25,
     int(Action.DONK_MEDIUM): 0.50,
     int(Action.ALL_IN): 3.00,  # approximate

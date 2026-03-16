@@ -93,10 +93,18 @@ class GTOAgent(Agent):
         self.abstraction_mismatches = 0
         self.bridge_log = []  # list of (concrete_ratio, mapped_action, phase, bucket)
 
-    def decide(self, ctx: HandContext) -> AgentDecision:
+    def compute_strategy(self, ctx: HandContext) -> dict:
+        """Compute the final action probability dict for this context.
+
+        Performs all lookup, mapping, and blending steps but does NOT sample.
+        Sets self._last_* attributes for use by detailed tracking and distorted bots.
+
+        Returns:
+            dict[int, float]: action_id → probability (sums to ~1.0)
+        """
         bucket = fast_bucket(ctx.hole_cards, ctx.community_cards,
                              simulations=self.simulations)
-        self._last_bucket = bucket  # exposed for detailed tracking
+        self._last_bucket = bucket
 
         history = _concrete_to_abstract_history(ctx.betting_history, ctx.phase)
         position = 'oop' if not ctx.is_ip else 'ip'
@@ -108,10 +116,7 @@ class GTOAgent(Agent):
             mapped_action = int(history[-1])
             self.bridge_log.append((concrete_ratio, mapped_action, ctx.phase, bucket))
 
-        # Fix: for abstract lookup, position is encoded by history length
-        # P0 (oop) acts at even history, P1 (ip) at odd history
-        # But in our match, SB=oop acts first preflop
-        # Position from history length:
+        # Position from history length
         pos_from_hist = 'oop' if len(history) % 2 == 0 else 'ip'
 
         has_bet = _has_bet_to_call(history, ctx.phase)
@@ -132,7 +137,6 @@ class GTOAgent(Agent):
                             for i in range(len(actions))}
                 self.lookup_hits += 1
             else:
-                # Action menu changed (abstraction expansion) — use uniform
                 uniform = 1.0 / len(actions)
                 strategy = {int(a): uniform for a in actions}
                 self.lookup_misses += 1
@@ -163,10 +167,8 @@ class GTOAgent(Agent):
             from eval_harness.confidence import (
                 compute_confidence, equity_heuristic, blend_strategies)
             eq_bucket, _ = decode_bucket(bucket)
-            # Get visit count for this node
             node = self.trainer.nodes.get(key)
             visit_count = float(node.strategy_sum.sum()) if node else 0.0
-            # Compute concrete bet ratio if opponent bet
             concrete_bet_ratio = None
             mapped_action_id = None
             if ctx.current_bet > ctx.my_bet and ctx.pot > 0:
@@ -176,9 +178,8 @@ class GTOAgent(Agent):
             alpha = compute_confidence(strategy, visit_count,
                                        concrete_bet_ratio=concrete_bet_ratio,
                                        mapped_action=mapped_action_id)
-            # For confidence_nearest/refine: only apply when mismatch is significant
             if self.mapping in ("confidence_nearest", "refine") and alpha < 0.05:
-                pass  # Skip blending for small mismatches
+                pass
             else:
                 heuristic = equity_heuristic(eq_bucket, has_bet, ctx.phase)
                 strategy = blend_strategies(strategy, heuristic, alpha)
@@ -198,7 +199,8 @@ class GTOAgent(Agent):
                 self.trainer, self._refiner,
                 ctx.phase, bucket, history, pos_from_hist,
                 strategy, concrete_bet_ratio_r, mapped_action_id_r,
-                visit_count_r, actions)
+                visit_count_r, actions,
+                community_cards=ctx.community_cards)
 
         # Apply opponent-adaptive adjustments (EQ0-3 bluff nodes only)
         if self.opponent_profile is not None:
@@ -207,6 +209,17 @@ class GTOAgent(Agent):
             if adjustments:
                 for a_id in list(strategy.keys()):
                     strategy[a_id] = max(0.0, strategy[a_id] * adjustments.get(a_id, 1.0))
+
+        # Store last-computed state for detailed tracking and distorted bots
+        self._last_strategy = dict(strategy)
+        self._last_actions = list(actions)
+        self._last_infoset_key = key
+        self._last_abstract_action = None  # filled after sampling in decide()
+
+        return strategy
+
+    def decide(self, ctx: HandContext) -> AgentDecision:
+        strategy = self.compute_strategy(ctx)
 
         # Sample action
         action_ids = list(strategy.keys())
@@ -218,6 +231,7 @@ class GTOAgent(Agent):
             weights = [1.0 / len(action_ids)] * len(action_ids)
 
         chosen = random.choices(action_ids, weights=weights, k=1)[0]
+        self._last_abstract_action = chosen
         return _abstract_to_concrete(Action(chosen), ctx)
 
 
@@ -284,6 +298,7 @@ def _abstract_to_concrete(action: Action, ctx: HandContext) -> AgentDecision:
         Action.BET_POT: max(ctx.min_raise, ctx.pot),
         Action.BET_OVERBET: max(ctx.min_raise, int(ctx.pot * 1.25)),
         Action.BET_DOUBLE_POT: max(ctx.min_raise, ctx.pot * 2),
+        Action.BET_TRIPLE_POT: max(ctx.min_raise, ctx.pot * 3),
         Action.DONK_SMALL: max(ctx.min_raise, ctx.pot // 4),
         Action.DONK_MEDIUM: max(ctx.min_raise, ctx.pot // 2),
     }
@@ -351,6 +366,12 @@ class DecisionRecord:
     eq_bucket: int           # equity bucket (-1 if not GTO agent)
     pot_before: int          # pot before this action
     amount: int              # chips committed by this action (0 for check/fold)
+    # AIVAT fields (populated when detailed_tracking=True and agent is GTOAgent)
+    strategy: dict = field(default_factory=dict)       # {action_int: prob} before sampling
+    available_actions: list = field(default_factory=list)  # abstract action ints
+    infoset_key: str = ""
+    abstract_action: int = -1                          # chosen abstract action int
+    pot_odds: float = 0.0                              # to_call / pot at this decision
 
 
 @dataclass
@@ -670,6 +691,20 @@ class HeadsUpMatch:
                         bucket = agent._last_bucket
                         eq_bucket = bucket // 15 if bucket >= 0 else -1
                     chips_spent = chips_before - chips[player_idx]
+                    # Populate AIVAT fields for GTOAgent instances
+                    rec_strategy = {}
+                    rec_actions = []
+                    rec_key = ""
+                    rec_abstract = -1
+                    rec_pot_odds = 0.0
+                    if isinstance(agent, GTOAgent):
+                        rec_strategy = getattr(agent, '_last_strategy', {})
+                        rec_actions = [int(a) for a in getattr(agent, '_last_actions', [])]
+                        rec_key = getattr(agent, '_last_infoset_key', "")
+                        rec_abstract = getattr(agent, '_last_abstract_action', -1) or -1
+                        to_call_rec = ctx.current_bet - ctx.my_bet
+                        if ctx.pot > 0 and to_call_rec > 0:
+                            rec_pot_odds = to_call_rec / ctx.pot
                     decisions.append(DecisionRecord(
                         player=player_idx,
                         phase=phase,
@@ -678,6 +713,11 @@ class HeadsUpMatch:
                         eq_bucket=eq_bucket,
                         pot_before=pot + bets[0] + bets[1],
                         amount=chips_spent,
+                        strategy=rec_strategy,
+                        available_actions=rec_actions,
+                        infoset_key=rec_key,
+                        abstract_action=rec_abstract,
+                        pot_odds=rec_pot_odds,
                     ))
 
                 # Record this player's action into the *other* agent's opponent profile

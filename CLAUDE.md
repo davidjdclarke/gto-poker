@@ -30,6 +30,7 @@ venv/bin/python -m pytest tests/
 poker/
 ├── train_gto.py               # Training CLI (tqdm + parallel workers)
 ├── run_eval_harness.py        # Full eval suite (4 test suites + multi-seed gauntlet)
+├── run_h2h.py                 # v12: GTO vs GTO head-to-head match runner with detailed analysis
 ├── run_phase0_validation.py   # V10 Phase 0: validation, diagnostics, cliff analysis
 ├── run_experiment.py          # Experiment tracking & comparison
 ├── simulate.py                # Self-play simulation (GTO vs heuristic bots)
@@ -45,16 +46,22 @@ poker/
 │   ├── engine.py              # Live game bridge (gto_decide entry point)
 │   ├── exploitability.py      # MC best response + audit tools
 │   ├── kuhn.py                # Kuhn poker benchmark (3-card game)
-│   ├── local_refine.py        # v11: local CFR refinement for off-tree actions
+│   ├── local_refine.py        # v12: Refine 2.0 — blueprint CFVs, adaptive threshold, texture blend
 │   ├── board_texture.py       # v11: board texture classification (dry/mono/draw/paired)
 │   └── strategy.json          # Saved strategy (30–40 MB)
 │
 ├── eval_harness/
-│   ├── match_engine.py        # HeadsUpMatch, GTOAgent
+│   ├── match_engine.py        # HeadsUpMatch, GTOAgent (+ compute_strategy(), DecisionRecord extensions)
 │   ├── adversaries.py         # 7 exploit bots (Nit, Aggro, Station, etc.)
+│   ├── advanced_adversaries.py # v12: 12 policy-distorted bots (4 styles × 3 intensities)
+│   ├── aivat.py               # v12: Half-AIVAT variance reduction
 │   ├── offtree_stress.py      # 11 off-tree sizing variants
 │   ├── translation_ab.py      # 4 mapping schemes A/B test
-│   └── fast_equity.py         # Preflop cache + fast postflop equity
+│   ├── fast_equity.py         # Preflop cache + fast postflop equity
+│   └── external/              # v12: external benchmarks
+│       ├── slumbot_client.py  # Slumbot API client
+│       ├── slumbot_match.py   # Slumbot match orchestrator
+│       └── openspiel_adapter.py # OpenSpiel stub (v13)
 │
 ├── tests/
 │   └── test_kuhn_benchmark.py # All 16 Nash eq. tests — must pass
@@ -138,6 +145,7 @@ class Action(IntEnum):
     BET_QUARTER_POT         = 13  # ~1/4 pot (check ↔ bet_third gap)
     BET_THREE_QUARTER_POT   = 14  # ~3/4 pot (2/3 ↔ pot gap)
     BET_DOUBLE_POT          = 15  # ~2x pot (overbet ↔ all-in gap)
+    BET_TRIPLE_POT          = 16  # ~3x pot (river only, via selective action — v12)
 ```
 
 ---
@@ -327,31 +335,50 @@ print(format_pain_map(analysis))
 
 ---
 
-## Current State (v11, 2026-03-16)
+## Current State (v12, 2026-03-16)
 
-**Best config: B0 + refine mapping** — `experiments/best/v9_B0_100M_allbots_positive.json` with `mapping="refine"`
-**Alternative: poly(2.0) + confidence_nearest** — `experiments/v11_poly2_100M.json`
-**Best mapping: `refine`** (v11: confidence_nearest base + local refinement for off-tree bets)
+**BLUEPRINT DECISION: poly(2.0) + refine** — `experiments/v11_poly2_100M.json` with `mapping="refine"`
+**Previous best: B0 + refine** — `experiments/best/v9_B0_100M_allbots_positive.json` with `mapping="refine"`
+**Best mapping: `refine`** (v12: Refine 2.0 — blueprint CFVs, adaptive threshold, board-texture blend)
 **B0 exploitability:** 1.2211 bb/100 | **poly(2.0) exploitability:** 1.2496 bb/100
 **Nodes:** B0: 1,055,003 | poly(2.0): 1,059,640
-**Gauntlet average (B0 + confidence_nearest):** +170.5 bb/100 (corrected baseline with CIs)
-**Gauntlet average (B0 + refine):** +288.3 bb/100 (v11 improvement, +102.4 over conf_nearest)
-**Gauntlet average (poly2 + confidence_nearest):** +227.0 bb/100 (+41.0 over B0)
+**Gauntlet average (poly2 + refine):** +215.9 bb/100 classic, +102.8 bb/100 advanced (10k hands × 3 seeds)
+**Gauntlet average (B0 + refine):** +202.6 bb/100 classic, +124.7 bb/100 advanced (10k hands × 3 seeds)
+**WS3 training status:** COMPLETE — REJECTED (two runs). See below.
+**⚠️ strategy.json WARNING:** Currently contains WS3-v2 (24.28 bb/100, underconverged). For production, load `experiments/v11_poly2_100M.json` explicitly.
 
-### Gauntlet Results (v11, 5k hands, 3 seeds)
+### Gauntlet Results (v12, 10k hands × 3 seeds — Blueprint Decision)
 
-| Bot | B0 + conf_nearest | B0 + refine | poly2 + conf_nearest |
-|-----|------------------:|------------:|---------------------:|
-| NitBot | +197.8 | +200.3 | +239.6 |
-| AggroBot | +444.0 | +520.0 | +546.8 |
-| OverfoldBot | +20.5 | -3.9 | -40.9 |
-| CallStationBot | +73.0 | +73.0 | +163.7 |
-| DonkBot | +676.4 | +1159.3 | +679.6 |
-| WeirdSizingBot | -291.7 | **-57.4** | -84.6 |
-| PerturbBot | +73.6 | +127.1 | +84.4 |
-| **Average** | **+170.5** | **+288.3** | **+227.0** |
+#### Classic Gauntlet
 
-> **Note:** B0 + conf_nearest column is from the parallel gauntlet (with CIs). B0 + refine and poly2 columns are from sequential head-to-head comparisons. See `docs/results/v11_results_20260315.md` for full analysis including the poly2+refine combo.
+| Bot | B0 + conf_nearest | B0 + refine | poly2 + refine | poly2 + conf_nearest |
+|-----|------------------:|------------:|---------------:|---------------------:|
+| NitBot | +216.1 | +253.1 | +158.1 | +151.3 |
+| AggroBot | +479.6 | +528.0 | +549.0 | +536.8 |
+| OverfoldBot | +3.3 | -14.0 | -31.4 | -43.2 |
+| CallStationBot | +54.5 | +57.9 | +89.6 | +84.6 |
+| DonkBot | +592.0 | +625.4 | +735.5 | +739.0 |
+| WeirdSizingBot | -159.7 | -86.4 | **+32.7** | +6.4 |
+| PerturbBot | +41.2 | +54.4 | -22.1 | +17.1 |
+| **Average** | **+175.3** | **+202.6** | **+215.9** | **+213.2** |
+
+#### Advanced Gauntlet (12 policy-distorted bots)
+
+| Style | B0 + refine | poly2 + refine | poly2 + conf_nearest |
+|-------|------------:|---------------:|---------------------:|
+| Aggressive (avg) | +340.5 | +258.7 | — |
+| Nit (avg) | -87.2 | +2.6 | — |
+| Station (avg) | +319.9 | +181.4 | — |
+| Overfolder (avg) | -74.3 | -31.5 | — |
+| **Average** | **+124.7** | **+102.8** | **+105.7** |
+| Robustness score | +11.5 | **+31.2** | — |
+| Worst case | -144.6 | **-81.0** | — |
+
+> **Decision rationale:** poly2+refine wins the weighted scoring matrix (88.5 vs 66.8) primarily due to WeirdSizingBot (+32.7 vs -86.4 = +119.1 bb/100 difference × 20% weight = +23.8 composite points). Classic avg also leads (+13.3 bb/100 × 30% = +4.0). B0+refine leads on advanced avg (+21.9 × 20% = +4.4), OverfoldBot (+17.4 × 10% = +1.7), and exploitability (0.029 × 20% = negligible). WeirdSizingBot gap is decisive. See `docs/results/v12_blueprint_decision.md` for full analysis.
+
+### AIVAT Limitation Note
+
+AIVAT (WS2) requires per-opponent calibration to be valid for gauntlet evaluation. The bucket-EV table built from GTO self-play has near-zero expected values, but continuation values against weak opponents are +100s of bb. The correction `cont_value - baseline ≈ cont_value` produces massive variance inflation, not reduction. **AIVAT is only valid for near-GTO matchups** (e.g., Slumbot or GTO exploitability measurement). The `--aivat` flag will produce unreliable numbers in gauntlet mode until per-opponent calibration is added.
 
 ### v10 Experiment Results Summary
 
@@ -364,6 +391,14 @@ print(format_pain_map(analysis))
 **16-action grid (200M):** Exploitability **41.4** (did NOT converge). Gauntlet +318 — weaker than B0 despite 2x training. The 3 new bet sizes created ~2x more nodes (2.0M vs 1.05M) and exploitability plateaued at ~40 instead of converging. NitBot -1289, WeirdSizingBot +218 (no improvement over B0's +220). **Verdict: not viable at current iteration budgets.**
 
 **DCFR sweep (16-action, 20M):** Tested gamma = {0.999, 0.995}. Both showed exploitability *increasing* from 10M to 20M. DCFR destabilizes convergence on wider action trees. **Verdict: counterproductive for this grid.**
+
+### What changed v11 → v12
+- **Advanced gauntlet (WS0):** `eval_harness/advanced_adversaries.py` — 12 `PolicyDistortedBot` instances (4 styles: aggressive/nit/station/overfolder × 3 intensities). Distorts GTO base strategy via multiplicative family reweighting with `min_support=0.01` floor. `robustness_score = mean - 0.5×std`. `--gauntlet-mode {classic,advanced,full}` CLI flag.
+- **AIVAT variance reduction (WS2):** `eval_harness/aivat.py` — bucket-EV approximation control variate. `AivatResult` dataclass. `build_bucket_ev_table()`, `aivat_adjusted_result()`. `--aivat` and `--build-bucket-ev` flags. `DecisionRecord` extended with `strategy`, `available_actions`, `infoset_key`, `abstract_action`, `pot_odds`.
+- **`compute_strategy()` refactor (prereq):** `GTOAgent.decide()` split into `compute_strategy(ctx) → dict` + sample step. Allows `PolicyDistortedBot` to intercept strategy before sampling.
+- **Refine 2.0 (WS1):** `local_refine.py` rewritten — blueprint CFV 1-ply backup (`_blueprint_cfv_for_action()`) replacing heuristic payoffs, adaptive threshold (`compute_adaptive_threshold()` using visit count + entropy + board texture), board-texture-aware blend alpha (`_compute_blend_alpha()`). Budget cap `_MAX_REFINE_BUDGET=100`. Diagnostic counters `blueprint_cfv_count` / `heuristic_fallback_count`.
+- **Selective river overbet (WS3):** `BET_TRIPLE_POT = 16` added to `Action` enum. NOT in base grid — registered only via `add_selective_action('river', ...)`. `--selective-river-overbet` flag in `train_gto.py`. Cython `ACT_BET_TRIPLE_POT = 16` with bet size `3.0×pot`. Sizing in both `match_engine.py` and `engine.py`.
+- **External calibration scaffold (WS5):** `eval_harness/external/` — `SlumbotClient`, `SlumbotMatch`, `openspiel_adapter.py` (stub). `--slumbot` and `--tier2` CLI flags.
 
 ### What changed v10 → v11
 - **Cython grid configurability (A2):** `cfr_fast.pyx` now accepts `action_grid_size` parameter (13 or 16). `set_action_grid_size()` / `get_action_grid_size()` in Cython. `--action-grid` CLI flag in `train_gto.py`. Python/Cython mismatch is now impossible.
@@ -393,15 +428,20 @@ print(format_pain_map(analysis))
 
 | Issue | Severity | Description | Status |
 |-------|----------|-------------|--------|
-| WeirdSizingBot -203 | Medium | Still weakest matchup even with confidence_nearest | Local refinement prototype in place (v11 C2) |
-| 16-action grid 15% coverage | High | Only 15% of nodes well-visited at 200M | Selective expansion available (v11 D1) |
+| WeirdSizingBot (B0+refine) | ~~Medium~~ **RESOLVED** | Was -86.4 with B0+refine; poly2+refine achieves +32.7 | Blueprint switched to poly2+refine (v12 decision) |
+| AIVAT gauntlet calibration | Medium | GTO self-play table produces biased corrections vs weak bots | Known limitation — only valid for near-GTO matches |
+| 16-action grid 15% coverage | High | Only 15% of nodes well-visited at 200M | Selective expansion available (v11 D1); WS3 rejected — node count doubled to 2M, exploitability 88.5 |
+| BET_TRIPLE_POT / WS3 | ~~High~~ **REJECTED** | Selective river overbet doubled node count; NitBot -1,114 bb/100 | Re-attempt only with narrow selectivity predicate (equity bucket ≥ 6 filter) |
+| strategy.json overwritten | **High** | WS3-v2 training wrote 24.28 bb/100 strategy to strategy.json | Load `experiments/v11_poly2_100M.json` explicitly for all production use |
+| street_ev attribution in run_h2h.py | Low | `street_ev` tracks chip investment, not EV; by-street numbers are not meaningful EVs | Replace with proper attribution (hand net → last street reached) in v13 |
 | OpponentProfile counterproductive | ~~Medium~~ **RETIRED** | Hurts performance, especially vs CallStation | Disabled by default (v11 A3) |
 | EQ0 river 100% bet | Low | Specific EQ0 nodes still 100% bet on river | Structural abstraction limit |
+| `--averaging-delay` not parsed | ~~Medium~~ **FIXED** | Value leaked as positional arg → "unknown sampling" error | `averaging_delay_override` variable added to `train_gto.py` |
 | Cython hardcodes 16-action | ~~Medium~~ **FIXED** | Can't train 13-action grid with Cython | Configurable via `set_action_grid_size()` (v11 A2) |
 | 16-action grid bug | ~~Critical~~ **FIXED** | `_postflop_actions()` broke 13-action B0 eval | Grid auto-detection added (v10) |
 | Published v9 results inflated | ~~Critical~~ **FIXED** | +677 avg was from 500-hand noise + grid bug | Corrected to +28.5 nearest / +225 conf_nearest |
 
-Full details: `docs/results/v11_results_20260315.md`, `docs/results/v10_complete_report.md`
+Full details: `docs/results/v12_complete_report_20260316.md`, `docs/results/v12_blueprint_decision.md`, `docs/results/v11_results_20260315.md`, `docs/results/v10_complete_report.md`
 
 ---
 
@@ -412,6 +452,8 @@ Full details: `docs/results/v11_results_20260315.md`, `docs/results/v10_complete
 Each results doc should include: exploitability, gauntlet table, bridge mapping A/B, off-tree stress test, strategy audit, and a comparison to the previous iteration. This creates a historical record of how the strategy evolves over time.
 
 Existing results:
+- `docs/results/v12_complete_report_20260316.md` — **v12 final report**: all workstreams, 50k H2H analysis, tree saturation finding, v13 recommendations
+- `docs/results/v12_blueprint_decision.md` — **v12 blueprint decision**: poly2+refine chosen; full gauntlet matrix scoring + WS3 rejection
 - `docs/results/v11_results_20260315.md` — **v11 results**: local refinement, solver dynamics, selective abstraction
 - `docs/results/v11_baseline_report.md` — v11 baseline template and configuration
 - `docs/results/v10_complete_report.md` — v10 definitive report: corrected baseline, confidence mapping, full analysis
@@ -426,7 +468,8 @@ Existing results:
 **Before starting a new improvement cycle, create an action plan in `docs/plans/`** describing the goals, hypotheses, and planned changes. Update the plan as work progresses. This provides a decision log for why changes were made.
 
 Existing plans:
-- `docs/plans/ACTION_PLAN_v11.md` — v11 research plan (current)
+- `docs/plans/ACTION_PLAN_v12.md` — v12 research plan (current)
+- `docs/plans/ACTION_PLAN_v11.md` — v11 research plan (complete)
 - `docs/plans/ACTION_PLAN_v10.md` — v10 research plan
 - `docs/plans/ACTION_PLAN_v9.md` — v9 improvement plan
 - `docs/plans/ACTION_PLAN_v8_ablations.md` — v8 ablation study plan
@@ -475,6 +518,23 @@ venv/bin/python run_eval_harness.py --gauntlet --hands 5000 --seeds 42,123,456
 6. Rebuild Cython: `venv/bin/python setup_cython.py build_ext --inplace`
 7. Retrain from scratch (abstraction changes invalidate strategy.json)
 
+### Run Head-to-Head Analysis (GTO vs GTO)
+
+```bash
+# Default: poly2+refine (P0) vs B0+refine (P1), 50k hands, 3 seeds
+venv/bin/python run_h2h.py
+
+# Custom configs
+venv/bin/python run_h2h.py \
+    --p0-strategy experiments/v11_poly2_100M.json --p0-mapping refine \
+    --p1-strategy experiments/best/v9_B0_100M_allbots_positive.json --p1-mapping refine \
+    --hands 50000 --seeds 42,123,456
+```
+
+Reports: overall EV (bb/100 per seed), by position (IP/OOP), by equity bucket, action frequency comparison, showdown stats, top-15 strategy divergence infosets (frequency-weighted TV distance).
+
+Note: by-street numbers use chip-investment attribution (see Known Issues) and should not be interpreted as per-street EV.
+
 ### Run Exploitability Check
 
 ```python
@@ -521,7 +581,7 @@ strategy = trainer.get_strategy('preflop', 0, (Action.OPEN_RAISE,), 'ip')
 
 6. **Postflop pot = 1.0 normalized**: All bet sizings in the solver are fractions of the normalized pot. The engine translates to real chips. `inv = [0.5, 0.5]` means each player has contributed 0.5 to a pot of 1.0.
 
-7. **`refine` is the recommended mapping (v11)**: Layers mini-CFR solve on top of `confidence_nearest` for extreme off-tree bets. B0+refine achieves +288.3 avg vs +186.0 for confidence_nearest alone (+102.4 improvement, zero regressions). GTOAgent default is `"confidence_nearest"` — pass `mapping="refine"` for best results.
+7. **`refine` is the recommended mapping (v12)**: Layers mini-CFR solve on top of `confidence_nearest` for extreme off-tree bets. The v12 blueprint is **poly2+refine**: load `experiments/v11_poly2_100M.json` and pass `mapping="refine"`. This achieves +215.9 classic avg and +32.7 WeirdSizingBot (vs -86.4 for B0+refine). GTOAgent default is `"confidence_nearest"` — pass `mapping="refine"` for best results.
 
 8. **Action grid auto-detection is required**: When loading a strategy, call `detect_action_grid_from_strategy()` and `set_action_grid()`. The B0 strategy uses a 13-action grid; the Cython trainer creates 16-action nodes. Mismatched grids cause ~45% lookup failures. `get_trainer()` in engine.py handles this automatically.
 
@@ -534,3 +594,7 @@ strategy = trainer.get_strategy('preflop', 0, (Action.OPEN_RAISE,), 'ip')
 12. **Selective actions don't affect existing strategies**: `add_selective_action()` adds actions to the Python action menu only. Existing strategy files won't have nodes for the new actions, so lookups will miss and use uniform. Must retrain to populate the new nodes.
 
 13. **OpponentProfile is disabled by default since v11**: The `--opponent-model` flag re-enables it. `--no-opponent-model` is still accepted but is now a no-op.
+
+14. **`train_gto.py` uses positional arg parsing, not argparse**: Pass iterations as `train_gto.py 100000000` (first positional), sampling as second positional (`external` or `vanilla`). All `--flag value` pairs are parsed separately and their values are excluded from the positional list. If a flag value is mistakenly left as positional, it appears as `sampling` and triggers "Unknown sampling method" error.
+
+15. **AIVAT is only valid for near-GTO matchups**: `--aivat` with a GTO self-play calibration table produces biased corrections when GTO plays against weak opponents (gauntlet bots). The control variate is zero-mean only when `E[cont_value | bucket] ≈ baseline`, which holds for GTO vs GTO but not GTO vs NitBot/AggroBot/etc. For gauntlet evaluation, ignore the AIVAT column or use per-opponent calibration.

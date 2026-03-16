@@ -311,3 +311,13 @@ def get_all_adversaries(trainer=None):
     if trainer is not None:
         bots.append(PerturbBot(trainer))
     return bots
+
+
+# Re-export advanced pool factory (requires trainer)
+def get_advanced_adversaries(trainer, base_mapping: str = "confidence_nearest"):
+    """Return the 12-bot policy-distorted advanced adversary pool.
+
+    Delegates to eval_harness.advanced_adversaries.get_advanced_adversaries.
+    """
+    from eval_harness.advanced_adversaries import get_advanced_adversaries as _get
+    return _get(trainer, base_mapping=base_mapping)

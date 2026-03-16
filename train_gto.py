@@ -582,6 +582,8 @@ def main():
     weight_schedule_mode = 0  # 0=linear, 1=exponential, 2=polynomial
     weight_schedule_param = 1.0
     action_grid_size = 0     # 0=default (Cython uses 16), 13=B0, 16=v9 expanded
+    selective_river_overbet = False  # v12: add BET_TRIPLE_POT on river via selective action
+    averaging_delay_override = -1    # -1 = use default (iterations // 4)
     skip_indices = set()
     for i, flag in enumerate(sys.argv[1:], 1):
         if flag == '--workers' and i < len(sys.argv) - 1:
@@ -619,6 +621,11 @@ def main():
         elif flag == '--action-grid' and i < len(sys.argv) - 1:
             action_grid_size = int(sys.argv[i + 1])
             skip_indices.add(i + 1)
+        elif flag == '--averaging-delay' and i < len(sys.argv) - 1:
+            averaging_delay_override = int(sys.argv[i + 1])
+            skip_indices.add(i + 1)
+        elif flag == '--selective-river-overbet':
+            selective_river_overbet = True
     if num_workers < 1:
         num_workers = 1
 
@@ -657,6 +664,8 @@ def main():
     grid_str = str(action_grid_size) if action_grid_size > 0 else 'default'
     print(f"│  Wt sched:   {wsched_str:>18}       │")
     print(f"│  Grid:       {grid_str:>18}       │")
+    overbet_str = 'yes' if selective_river_overbet else 'no'
+    print(f"│  River 3xpot:{overbet_str:>18}       │")
     print(f"└─────────────────────────────────────────────────┘")
 
     trainer = CFRTrainer()
@@ -670,7 +679,17 @@ def main():
         else:
             print("Starting fresh training...")
 
-    averaging_delay = iterations // 4
+    # v12 WS3: selective river overbet (BET_TRIPLE_POT on river)
+    if selective_river_overbet:
+        from server.gto.abstraction import add_selective_action, Action as _Action
+        add_selective_action('river', 'no_bet', _Action.BET_TRIPLE_POT)
+        add_selective_action('river', 'facing_bet', _Action.BET_TRIPLE_POT)
+        if HAS_CYTHON:
+            from server.gto import cfr_fast as _cfr_fast
+            _cfr_fast.sync_selective_actions_from_python()
+        print("  [WS3] Selective river overbet: BET_TRIPLE_POT (3x pot) enabled on river")
+
+    averaging_delay = averaging_delay_override if averaging_delay_override >= 0 else iterations // 4
 
     # Checkpoint setup
     ckpt_log = []

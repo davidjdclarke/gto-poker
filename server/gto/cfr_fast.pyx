@@ -46,6 +46,8 @@ cdef int ACT_DONK_MEDIUM = 12
 cdef int ACT_BET_QUARTER = 13
 cdef int ACT_BET_THREE_QUARTER = 14
 cdef int ACT_BET_DOUBLE_POT = 15
+# v12 selective addition (river only via add_selective_action / set_selective_action)
+cdef int ACT_BET_TRIPLE_POT = 16
 
 cdef int MAX_HISTORY = 12
 
@@ -92,6 +94,7 @@ cdef inline bint is_raise_action(int action) noexcept nogil:
             action == ACT_BET_TWO_THIRDS or action == ACT_BET_THREE_QUARTER or
             action == ACT_BET_POT or
             action == ACT_BET_OVERBET or action == ACT_BET_DOUBLE_POT or
+            action == ACT_BET_TRIPLE_POT or
             action == ACT_ALL_IN or
             action == ACT_OPEN_RAISE or action == ACT_THREE_BET or
             action == ACT_FOUR_BET or
@@ -187,6 +190,8 @@ cdef void player_investments(int* history, int hlen,
                 bet = total_pot * 1.25
             elif action == ACT_BET_DOUBLE_POT:
                 bet = total_pot * 2.0
+            elif action == ACT_BET_TRIPLE_POT:
+                bet = total_pot * 3.0
             elif action == ACT_OPEN_RAISE:
                 bet = total_pot * 0.75
             elif action == ACT_THREE_BET:
@@ -319,7 +324,7 @@ cdef int get_postflop_actions(bint has_bet, bint can_raise,
         # Append selective actions from bitmask (v11 D1)
         sel_mask = _selective_actions[phase_int * 2 + context]
         if sel_mask != 0:
-            for a in range(16):
+            for a in range(17):
                 if (sel_mask >> a) & 1:
                     # Only add if not already in the action list
                     if not _action_in_list(out_actions, n, a):
@@ -688,7 +693,7 @@ def set_selective_action(int phase, int context, int action_id, bint enabled=Tru
     cdef int idx = phase * 2 + context
     if idx < 0 or idx >= 8:
         raise ValueError(f"Invalid phase={phase} context={context}")
-    if action_id < 0 or action_id > 15:
+    if action_id < 0 or action_id > 16:
         raise ValueError(f"Invalid action_id={action_id}")
     if enabled:
         _selective_actions[idx] |= (1 << action_id)
@@ -732,7 +737,7 @@ def sync_selective_actions_from_python():
         idx = phase_int * 2 + ctx_int
         for action in actions:
             aid = int(action)
-            if 0 <= aid <= 15:
+            if 0 <= aid <= 16:
                 _selective_actions[idx] |= (1 << aid)
 
 

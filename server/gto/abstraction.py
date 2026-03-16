@@ -33,6 +33,8 @@ class Action(IntEnum):
     BET_QUARTER_POT = 13      # Bet/raise ~1/4 pot (fills check ↔ bet_third gap)
     BET_THREE_QUARTER_POT = 14  # Bet/raise ~3/4 pot (fills 2/3 ↔ pot gap)
     BET_DOUBLE_POT = 15       # Bet/raise ~2x pot (fills overbet ↔ all-in gap)
+    # v12 selective addition — river only via add_selective_action()
+    BET_TRIPLE_POT = 16       # Bet/raise ~3x pot (extreme overbet / jam alternative)
 
 
 ACTION_NAMES = {
@@ -52,6 +54,7 @@ ACTION_NAMES = {
     Action.BET_QUARTER_POT: "bet 1/4 pot",
     Action.BET_THREE_QUARTER_POT: "bet 3/4 pot",
     Action.BET_DOUBLE_POT: "bet 2x pot",
+    Action.BET_TRIPLE_POT: "bet 3x pot",
 }
 
 
@@ -422,6 +425,7 @@ def count_raises(history: tuple[int, ...], phase: str = 'postflop') -> int:
         int(Action.BET_HALF_POT), int(Action.BET_TWO_THIRDS_POT),
         int(Action.BET_THREE_QUARTER_POT), int(Action.BET_POT),
         int(Action.BET_OVERBET), int(Action.BET_DOUBLE_POT),
+        int(Action.BET_TRIPLE_POT),
         int(Action.ALL_IN),
         int(Action.DONK_SMALL), int(Action.DONK_MEDIUM),
     }
@@ -472,6 +476,7 @@ _POSTFLOP_CONCRETE_MAP: dict[str, int] = {
     "bet_pot":         int(Action.BET_POT),
     "bet_overbet":     int(Action.BET_OVERBET),
     "bet_double_pot":  int(Action.BET_DOUBLE_POT),
+    "bet_triple_pot":  int(Action.BET_TRIPLE_POT),
 }
 
 

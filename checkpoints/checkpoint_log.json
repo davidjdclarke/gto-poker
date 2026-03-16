@@ -1,92 +1,72 @@
 [
   {
     "iterations": 110000000,
-    "nodes": 1998707,
-    "timestamp": "20260315_002902",
+    "nodes": 1055281,
+    "timestamp": "20260316_125010",
     "file": "checkpoints/ckpt_110000000.json",
-    "exploitability": 42.9555
+    "exploitability": 24.6249
   },
   {
     "iterations": 120000000,
-    "nodes": 1999030,
-    "timestamp": "20260315_004423",
+    "nodes": 1055554,
+    "timestamp": "20260316_131748",
     "file": "checkpoints/ckpt_120000000.json",
-    "exploitability": 41.3196
+    "exploitability": 24.7658
   },
   {
     "iterations": 130000000,
-    "nodes": 1999246,
-    "timestamp": "20260315_010011",
+    "nodes": 1055785,
+    "timestamp": "20260316_132729",
     "file": "checkpoints/ckpt_130000000.json",
-    "exploitability": 42.2358
+    "exploitability": 25.0982
   },
   {
     "iterations": 140000000,
-    "nodes": 1999479,
-    "timestamp": "20260315_011544",
+    "nodes": 1055974,
+    "timestamp": "20260316_145456",
     "file": "checkpoints/ckpt_140000000.json",
-    "exploitability": 42.5711
+    "exploitability": 26.8477
   },
   {
     "iterations": 150000000,
-    "nodes": 1999601,
-    "timestamp": "20260315_013102",
+    "nodes": 1056153,
+    "timestamp": "20260316_150521",
     "file": "checkpoints/ckpt_150000000.json",
-    "exploitability": 39.9929,
-    "gauntlet": {
-      "NitBot": -1459.4,
-      "AggroBot": 980.5,
-      "OverfoldBot": 23.9,
-      "CallStationBot": 739.6,
-      "DonkBot": 1488.3,
-      "WeirdSizingBot": -177.6,
-      "PerturbBot": -7.5,
-      "avg_bb_per_100": 226.8
-    }
+    "exploitability": 23.0661
   },
   {
     "iterations": 160000000,
-    "nodes": 1999701,
-    "timestamp": "20260315_014614",
+    "nodes": 1056273,
+    "timestamp": "20260316_151430",
     "file": "checkpoints/ckpt_160000000.json",
-    "exploitability": 39.7531
+    "exploitability": 23.7361
   },
   {
     "iterations": 170000000,
-    "nodes": 1999757,
-    "timestamp": "20260315_020126",
+    "nodes": 1056420,
+    "timestamp": "20260316_152235",
     "file": "checkpoints/ckpt_170000000.json",
-    "exploitability": 44.16
+    "exploitability": 23.7276
   },
   {
     "iterations": 180000000,
-    "nodes": 1999804,
-    "timestamp": "20260315_095254",
+    "nodes": 1056530,
+    "timestamp": "20260316_153105",
     "file": "checkpoints/ckpt_180000000.json",
-    "exploitability": 40.118
+    "exploitability": 25.9643
   },
   {
     "iterations": 190000000,
-    "nodes": 1999841,
-    "timestamp": "20260315_100847",
+    "nodes": 1056672,
+    "timestamp": "20260316_154013",
     "file": "checkpoints/ckpt_190000000.json",
-    "exploitability": 42.8896
+    "exploitability": 24.5501
   },
   {
     "iterations": 200000000,
-    "nodes": 1999902,
-    "timestamp": "20260315_102409",
+    "nodes": 1056752,
+    "timestamp": "20260316_154830",
     "file": "checkpoints/ckpt_200000000.json",
-    "exploitability": 41.4001,
-    "gauntlet": {
-      "NitBot": -1289.0,
-      "AggroBot": 1527.3,
-      "OverfoldBot": 31.6,
-      "CallStationBot": 705.2,
-      "DonkBot": 1046.5,
-      "WeirdSizingBot": 217.6,
-      "PerturbBot": -13.4,
-      "avg_bb_per_100": 318.0
-    }
+    "exploitability": 25.5034
   }
 ]
