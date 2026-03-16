@@ -20,15 +20,29 @@ strategy_*.json
 # Backup strategy files
 *.bak
 
-# Checkpoint strategy files (160-170MB each)
-checkpoints/ckpt_*.json
+# Checkpoint directories and files (160-280MB each)
+checkpoints/
+checkpoints_*/
 
 # DCFR sweep strategy files
-dcfr_sweep/strategy_*.json
+dcfr_sweep/
+
+# Large strategy files in experiments (170MB each)
+experiments/best/
+experiments/ablations/*/strategy.json
 
 # Cython generated
 server/gto/cfr_fast.c
 eval_harness/eval_fast.c
+
+# Ephemeral eval results
+eval_results/
+
+# Reference PDFs (binary)
+docs/*.pdf
+
+# Claude Code config
+.claude/
 
 # IDE
 .vscode/
