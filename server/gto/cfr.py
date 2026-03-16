@@ -43,7 +43,8 @@ STRATEGY_VERSION = 6  # v6: 2/3pot, overbet, donk bets, all-in audit
 def _parallel_worker(worker_id, n_iters, start_iter, avg_delay, seed,
                      phase_schedule_mode=1, allin_dampen_mode=1,
                      adaptive_averaging=0, regret_discount=1.0,
-                     weight_schedule_mode=0, weight_schedule_param=1.0):
+                     weight_schedule_mode=0, weight_schedule_param=1.0,
+                     action_grid_size=0):
     """Worker function for parallel CFR training.
 
     Runs in a forked child process. The node_pool is in shared mmap memory,
@@ -59,7 +60,8 @@ def _parallel_worker(worker_id, n_iters, start_iter, avg_delay, seed,
                          adaptive_averaging=adaptive_averaging,
                          regret_discount=regret_discount,
                          weight_schedule_mode=weight_schedule_mode,
-                         weight_schedule_param=weight_schedule_param)
+                         weight_schedule_param=weight_schedule_param,
+                         action_grid_size=action_grid_size)
 
 PHASES = ['preflop', 'flop', 'turn', 'river']
 
@@ -167,7 +169,8 @@ class CFRTrainer:
               sampling: str = 'external',
               progress_callback=None,
               chunk_size: int = 5000,
-              num_workers: int = 1):
+              num_workers: int = 1,
+              action_grid_size: int = 0):
         """
         Run CFR+ training with per-street traversal and correlated buckets.
 
@@ -186,6 +189,7 @@ class CFRTrainer:
                                called periodically for progress reporting.
             chunk_size: Iterations per progress update (Cython only).
             num_workers: Number of parallel workers (>1 uses shared memory).
+            action_grid_size: 0=use current, 13=v6/B0, 16=v9 expanded.
         """
         if HAS_CYTHON and sampling == 'external':
             if num_workers > 1:
@@ -198,7 +202,8 @@ class CFRTrainer:
                                             adaptive_averaging=adaptive_averaging,
                                             regret_discount=regret_discount,
                                             weight_schedule_mode=weight_schedule_mode,
-                                            weight_schedule_param=weight_schedule_param)
+                                            weight_schedule_param=weight_schedule_param,
+                                            action_grid_size=action_grid_size)
             else:
                 self._train_cython(num_iterations, averaging_delay,
                                    progress_callback=progress_callback,
@@ -208,18 +213,28 @@ class CFRTrainer:
                                    adaptive_averaging=adaptive_averaging,
                                    regret_discount=regret_discount,
                                    weight_schedule_mode=weight_schedule_mode,
-                                   weight_schedule_param=weight_schedule_param)
+                                   weight_schedule_param=weight_schedule_param,
+                                   action_grid_size=action_grid_size)
             return
 
         # Python fallback: store config for _cfr_single_street access
         self._allin_dampen_mode = allin_dampen_mode
         self._regret_discount = regret_discount
+        self._weight_schedule_mode = weight_schedule_mode
+        self._weight_schedule_param = weight_schedule_param
         schedule = PHASE_SCHEDULE_3X if phase_schedule_mode == 1 else PHASE_SCHEDULE_2X
         start_iter = self.iterations
 
         for i in range(num_iterations):
             t = start_iter + i + 1
-            weight = max(t - averaging_delay, 0)
+            if weight_schedule_mode == 3:
+                # Scheduled DCFR
+                alpha = 1.5
+                gamma = weight_schedule_param if weight_schedule_param != 1.0 else 2.0
+                weight = (t / (t + 1.0)) ** gamma
+                self._regret_discount = (t ** alpha) / (t ** alpha + 1.0)
+            else:
+                weight = max(t - averaging_delay, 0)
 
             # Train each street with correlated buckets
             for phase_idx in schedule:
@@ -251,7 +266,8 @@ class CFRTrainer:
                       adaptive_averaging: int = 0,
                       regret_discount: float = 1.0,
                       weight_schedule_mode: int = 0,
-                      weight_schedule_param: float = 1.0):
+                      weight_schedule_param: float = 1.0,
+                      action_grid_size: int = 0):
         """Run training using Cython-accelerated CFR.
 
         Args:
@@ -263,7 +279,12 @@ class CFRTrainer:
             regret_discount: DCFR discount factor (1.0=standard CFR+, <1.0=DCFR).
             weight_schedule_mode: 0=linear, 1=exponential, 2=polynomial.
             weight_schedule_param: parameter for weight schedule (base/power).
+            action_grid_size: 0=use current, 13=v6/B0, 16=v9 expanded.
         """
+        # Set action grid before training
+        if action_grid_size > 0:
+            _cfr_fast.set_action_grid_size(action_grid_size)
+
         # Initialize Cython node pool
         _cfr_fast.init_pool()
 
@@ -287,6 +308,7 @@ class CFRTrainer:
                 regret_discount=regret_discount,
                 weight_schedule_mode=weight_schedule_mode,
                 weight_schedule_param=weight_schedule_param,
+                action_grid_size=action_grid_size,
             )
             done += batch
 
@@ -305,7 +327,8 @@ class CFRTrainer:
                                adaptive_averaging: int = 0,
                                regret_discount: float = 1.0,
                                weight_schedule_mode: int = 0,
-                               weight_schedule_param: float = 1.0):
+                               weight_schedule_param: float = 1.0,
+                               action_grid_size: int = 0):
         """Parallel CFR+ using shared memory and multiprocessing.
 
         Phase 1 (warmup): Single-threaded training to discover all game tree
@@ -324,6 +347,10 @@ class CFRTrainer:
 
         warmup_iters = max(10000, int(num_iterations * warmup_frac))
         parallel_iters = num_iterations - warmup_iters
+
+        # Set action grid before training
+        if action_grid_size > 0:
+            _cfr_fast.set_action_grid_size(action_grid_size)
 
         # Pre-allocate shared memory pool (2M nodes, ~430 MB)
         _cfr_fast.init_pool_shared(2_000_000)
@@ -351,6 +378,7 @@ class CFRTrainer:
                 regret_discount=regret_discount,
                 weight_schedule_mode=weight_schedule_mode,
                 weight_schedule_param=weight_schedule_param,
+                action_grid_size=action_grid_size,
             )
             done += batch
             if progress_callback:
@@ -378,7 +406,8 @@ class CFRTrainer:
                 args=(w, w_iters, start, averaging_delay, w_seed,
                       phase_schedule_mode, allin_dampen_mode,
                       adaptive_averaging, regret_discount,
-                      weight_schedule_mode, weight_schedule_param))
+                      weight_schedule_mode, weight_schedule_param,
+                      action_grid_size))
             processes.append(p)
             p.start()
 

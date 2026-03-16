@@ -75,13 +75,18 @@ class GTOAgent(Agent):
     """Plays according to trained CFR strategy with configurable action mapping."""
 
     def __init__(self, trainer: CFRTrainer, name: str = "GTO",
-                 mapping: str = "nearest", simulations: int = 80,
+                 mapping: str = "confidence_nearest", simulations: int = 80,
                  opponent_profile: "OpponentProfile | None" = None):
         self.trainer = trainer
         self.name = name
-        self.mapping = mapping  # nearest, conservative, stochastic, resolve, blend
+        self.mapping = mapping  # nearest, conservative, stochastic, resolve, blend, refine
         self.simulations = simulations
         self.opponent_profile = opponent_profile
+        # Local refiner (lazy init for "refine" mapping)
+        self._refiner = None
+        if mapping == "refine":
+            from server.gto.local_refine import LocalRefiner
+            self._refiner = LocalRefiner(trainer)
         # Diagnostics
         self.lookup_hits = 0
         self.lookup_misses = 0
@@ -153,7 +158,8 @@ class GTOAgent(Agent):
                 strategy[int(Action.CHECK_CALL)] += boost
 
         # Apply blend mapping: mix trained strategy with equity heuristic
-        if self.mapping in ("blend", "confidence_nearest"):
+        # "refine" also gets confidence_nearest as a base layer
+        if self.mapping in ("blend", "confidence_nearest", "refine"):
             from eval_harness.confidence import (
                 compute_confidence, equity_heuristic, blend_strategies)
             eq_bucket, _ = decode_bucket(bucket)
@@ -170,12 +176,29 @@ class GTOAgent(Agent):
             alpha = compute_confidence(strategy, visit_count,
                                        concrete_bet_ratio=concrete_bet_ratio,
                                        mapped_action=mapped_action_id)
-            # For confidence_nearest: only apply when mismatch is significant
-            if self.mapping == "confidence_nearest" and alpha < 0.05:
+            # For confidence_nearest/refine: only apply when mismatch is significant
+            if self.mapping in ("confidence_nearest", "refine") and alpha < 0.05:
                 pass  # Skip blending for small mismatches
             else:
                 heuristic = equity_heuristic(eq_bucket, has_bet, ctx.phase)
                 strategy = blend_strategies(strategy, heuristic, alpha)
+
+        # Apply local refinement for off-tree actions (v11)
+        if self.mapping == "refine" and self._refiner is not None:
+            from server.gto.local_refine import refine_or_blueprint
+            concrete_bet_ratio_r = None
+            mapped_action_id_r = None
+            if ctx.current_bet > ctx.my_bet and ctx.pot > 0:
+                concrete_bet_ratio_r = (ctx.current_bet - ctx.my_bet) / ctx.pot
+                if history:
+                    mapped_action_id_r = int(history[-1])
+            node_r = self.trainer.nodes.get(key)
+            visit_count_r = float(node_r.strategy_sum.sum()) if node_r else 0.0
+            strategy = refine_or_blueprint(
+                self.trainer, self._refiner,
+                ctx.phase, bucket, history, pos_from_hist,
+                strategy, concrete_bet_ratio_r, mapped_action_id_r,
+                visit_count_r, actions)
 
         # Apply opponent-adaptive adjustments (EQ0-3 bluff nodes only)
         if self.opponent_profile is not None:

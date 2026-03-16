@@ -277,8 +277,12 @@ cdef int get_preflop_actions(bint has_bet, bint can_raise, int raise_count,
 
 cdef int get_postflop_actions(bint has_bet, bint can_raise,
                                bint is_donk_eligible,
+                               int phase_int,
                                int* out_actions) noexcept nogil:
     cdef int n = 0
+    cdef int context = 1 if has_bet else 0
+    cdef unsigned int sel_mask
+    cdef int a
     if has_bet:
         out_actions[n] = ACT_FOLD; n += 1
         out_actions[n] = ACT_CHECK_CALL; n += 1
@@ -292,8 +296,8 @@ cdef int get_postflop_actions(bint has_bet, bint can_raise,
             out_actions[n] = ACT_BET_TWO_THIRDS; n += 1
             out_actions[n] = ACT_BET_POT; n += 1
             out_actions[n] = ACT_ALL_IN; n += 1
-        else:
-            # Standard postflop: full sizing menu (v9: +quarter, +3/4, +double)
+        elif _action_grid_size >= 16:
+            # 16-action grid: full sizing menu (v9 expansion)
             out_actions[n] = ACT_BET_QUARTER; n += 1
             out_actions[n] = ACT_BET_THIRD; n += 1
             out_actions[n] = ACT_BET_HALF; n += 1
@@ -303,7 +307,32 @@ cdef int get_postflop_actions(bint has_bet, bint can_raise,
             out_actions[n] = ACT_BET_OVERBET; n += 1
             out_actions[n] = ACT_BET_DOUBLE_POT; n += 1
             out_actions[n] = ACT_ALL_IN; n += 1
+        else:
+            # 13-action grid (v6/B0): standard postflop sizing
+            out_actions[n] = ACT_BET_THIRD; n += 1
+            out_actions[n] = ACT_BET_HALF; n += 1
+            out_actions[n] = ACT_BET_TWO_THIRDS; n += 1
+            out_actions[n] = ACT_BET_POT; n += 1
+            out_actions[n] = ACT_BET_OVERBET; n += 1
+            out_actions[n] = ACT_ALL_IN; n += 1
+
+        # Append selective actions from bitmask (v11 D1)
+        sel_mask = _selective_actions[phase_int * 2 + context]
+        if sel_mask != 0:
+            for a in range(16):
+                if (sel_mask >> a) & 1:
+                    # Only add if not already in the action list
+                    if not _action_in_list(out_actions, n, a):
+                        out_actions[n] = a; n += 1
     return n
+
+
+cdef inline bint _action_in_list(int* actions, int count, int action) noexcept nogil:
+    cdef int i
+    for i in range(count):
+        if actions[i] == action:
+            return True
+    return False
 
 
 cdef int get_actions(bint has_bet, bint can_raise, bint is_preflop,
@@ -316,7 +345,7 @@ cdef int get_actions(bint has_bet, bint can_raise, bint is_preflop,
         is_donk_eligible = ((phase == PHASE_FLOP or phase == PHASE_TURN)
                              and hlen == 0 and not has_bet)
         return get_postflop_actions(has_bet, can_raise, is_donk_eligible,
-                                     out_actions)
+                                     phase, out_actions)
 
 
 # --- Node operations using flat arrays ---
@@ -430,6 +459,18 @@ cdef long long* _progress_counters = NULL
 cdef size_t _progress_counters_size = 0
 cdef int _worker_id = -1
 
+# --- Action grid config (shared source of truth with abstraction.py) ---
+cdef int _action_grid_size = 16    # 13=v6/B0 grid, 16=v9 expanded grid
+
+# --- Selective action config (v11 D1) ---
+# Bitmask of extra actions to add per phase+context.
+# Indexed as: _selective_actions[phase * 2 + context]
+#   phase: 0=preflop, 1=flop, 2=turn, 3=river
+#   context: 0=no_bet, 1=facing_bet
+# Each entry is a bitmask where bit i means action i is added.
+cdef unsigned int _selective_actions[8]  # 4 phases * 2 contexts
+
+
 # --- Ablation config flags (set by train_fast) ---
 cdef int _allin_dampen_mode = 1    # 0=old (rc<2, 0.7x), 1=new (rc==0, 0.5x)
 cdef int _phase_schedule_mode = 1  # 0=2x (6-step), 1=3x (8-step)
@@ -534,6 +575,7 @@ cdef void _grow_pool():
 def init_pool():
     """Initialize the node pool. Call before training."""
     global node_pool, node_count, node_index, MAX_NODES, _shared_mode, _shared_pool_size
+    cdef int i
     MAX_NODES = 500000
     if node_pool != NULL:
         if _shared_mode:
@@ -547,6 +589,9 @@ def init_pool():
     node_count = 0
     node_index = {}
     _shared_pool_size = 0
+    # Clear selective actions to prevent cross-run contamination
+    for i in range(8):
+        _selective_actions[i] = 0
 
 
 def init_pool_shared(int max_nodes=2000000):
@@ -584,6 +629,10 @@ def init_pool_shared(int max_nodes=2000000):
     node_index = {}
     _shared_mode = True
     _no_create_mode = False
+    # Clear selective actions to prevent cross-run contamination
+    cdef int i
+    for i in range(8):
+        _selective_actions[i] = 0
 
 
 def cleanup_pool():
@@ -606,6 +655,85 @@ def set_no_create_mode(bint enabled=True):
     instead of being created. Used by worker processes in parallel training."""
     global _no_create_mode
     _no_create_mode = enabled
+
+
+def set_action_grid_size(int size):
+    """Set the action grid size for Cython training (13 or 16).
+
+    Must match abstraction.py's set_action_grid(). Call before training
+    or importing nodes to ensure Python and Cython use the same grid.
+    """
+    global _action_grid_size
+    if size not in (13, 16):
+        raise ValueError(f"Invalid action grid size: {size}. Must be 13 or 16.")
+    _action_grid_size = size
+
+
+def get_action_grid_size():
+    """Return the current Cython action grid size."""
+    return _action_grid_size
+
+
+def set_selective_action(int phase, int context, int action_id, bint enabled=True):
+    """Add or remove a selective action for a specific phase+context.
+
+    Mirrors abstraction.py's add_selective_action() for Cython parity.
+
+    Args:
+        phase: 0=preflop, 1=flop, 2=turn, 3=river
+        context: 0=no_bet, 1=facing_bet
+        action_id: Action enum int (0-15)
+        enabled: True to add, False to remove
+    """
+    cdef int idx = phase * 2 + context
+    if idx < 0 or idx >= 8:
+        raise ValueError(f"Invalid phase={phase} context={context}")
+    if action_id < 0 or action_id > 15:
+        raise ValueError(f"Invalid action_id={action_id}")
+    if enabled:
+        _selective_actions[idx] |= (1 << action_id)
+    else:
+        _selective_actions[idx] &= ~(1 << action_id)
+
+
+def clear_selective_actions():
+    """Remove all selective action additions."""
+    cdef int i
+    for i in range(8):
+        _selective_actions[i] = 0
+
+
+def get_selective_actions_mask(int phase, int context):
+    """Return the selective action bitmask for debugging."""
+    cdef int idx = phase * 2 + context
+    if idx < 0 or idx >= 8:
+        return 0
+    return _selective_actions[idx]
+
+
+def sync_selective_actions_from_python():
+    """Sync selective actions from abstraction.py's _SELECTIVE_ACTIONS dict.
+
+    Call this before training to ensure Cython and Python menus match.
+    """
+    from server.gto.abstraction import _SELECTIVE_ACTIONS
+    cdef int i
+    # Clear first
+    for i in range(8):
+        _selective_actions[i] = 0
+    # Phase name to int
+    phase_map = {'preflop': 0, 'flop': 1, 'turn': 2, 'river': 3}
+    context_map = {'no_bet': 0, 'facing_bet': 1}
+    for (phase_name, ctx_name), actions in _SELECTIVE_ACTIONS.items():
+        phase_int = phase_map.get(phase_name, -1)
+        ctx_int = context_map.get(ctx_name, -1)
+        if phase_int < 0 or ctx_int < 0:
+            continue
+        idx = phase_int * 2 + ctx_int
+        for action in actions:
+            aid = int(action)
+            if 0 <= aid <= 15:
+                _selective_actions[idx] |= (1 << aid)
 
 
 # --- Phase constants ---
@@ -849,7 +977,7 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
                unsigned int seed=42, int phase_schedule_mode=1,
                int allin_dampen_mode=1, int adaptive_averaging=0,
                double regret_discount=1.0, int weight_schedule_mode=0,
-               double weight_schedule_param=1.0):
+               double weight_schedule_param=1.0, int action_grid_size=0):
     """
     Run CFR+ training entirely in Cython.
 
@@ -863,12 +991,14 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
         regret_discount: DCFR discount (1.0=CFR+, <1.0=DCFR)
         weight_schedule_mode: 0=linear, 1=exponential, 2=polynomial
         weight_schedule_param: parameter for weight schedule
+        action_grid_size: 0=use current setting, 13=v6/B0 grid, 16=v9 expanded
 
     Returns total iterations completed.
     """
     global _allin_dampen_mode, _phase_schedule_mode, _adaptive_averaging
     global _current_iter, _global_averaging_delay
     global _regret_discount, _weight_schedule_mode, _weight_schedule_param
+    global _action_grid_size
     _allin_dampen_mode = allin_dampen_mode
     _phase_schedule_mode = phase_schedule_mode
     _adaptive_averaging = adaptive_averaging
@@ -876,6 +1006,10 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
     _regret_discount = regret_discount
     _weight_schedule_mode = weight_schedule_mode
     _weight_schedule_param = weight_schedule_param
+    if action_grid_size > 0:
+        if action_grid_size not in (13, 16):
+            raise ValueError(f"Invalid action_grid_size: {action_grid_size}")
+        _action_grid_size = action_grid_size
 
     rng_seed(<unsigned long long>seed)
 
@@ -911,6 +1045,11 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
         phase_schedule[6] = PHASE_TURN
         phase_schedule[7] = PHASE_RIVER
 
+    # For scheduled DCFR (mode 3), we need per-iteration discount
+    cdef double alpha_dcfr = 1.5   # positive regret discount exponent
+    cdef double gamma_dcfr = _weight_schedule_param if _weight_schedule_mode == 3 else 2.0
+    cdef double t_ratio
+
     for i in range(num_iterations):
         t = start_iter + i + 1
         _current_iter = t
@@ -923,6 +1062,14 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
         elif _weight_schedule_mode == 2:
             # Polynomial: (t - delay)^param
             weight = (<double>(t - averaging_delay)) ** _weight_schedule_param
+        elif _weight_schedule_mode == 3:
+            # Scheduled DCFR: weight = (t/(t+1))^gamma, discount = t^alpha/(t^alpha+1)
+            # Based on Brown & Sandholm "Dynamic DCFR" + Hyperparameter Schedules
+            t_ratio = <double>t / (<double>t + 1.0)
+            weight = t_ratio ** gamma_dcfr
+            # Time-varying regret discount: t^alpha / (t^alpha + 1)
+            # Approaches 1.0 as t grows (less discounting over time)
+            _regret_discount = (<double>t ** alpha_dcfr) / (<double>t ** alpha_dcfr + 1.0)
         else:
             # Linear (default): t - delay
             weight = <double>(t - averaging_delay)

@@ -45,7 +45,7 @@ from server.gto.exploitability import (
 )
 
 
-_USE_OPPONENT_MODEL = True  # Module-level flag, overridden by --no-opponent-model
+_USE_OPPONENT_MODEL = False  # Disabled by default (v11): OpponentProfile was counterproductive (v10 Phase 0)
 
 
 def _play_one_matchup(opp_index: int, num_hands: int, seed: int,
@@ -140,8 +140,9 @@ def run_gauntlet(trainer: CFRTrainer, num_hands: int, seed: int,
         total_misses = 0
 
         for opp in tqdm(adversaries, desc="  Gauntlet", unit="matchup", leave=True):
+            opp_profile = OpponentProfile() if _USE_OPPONENT_MODEL else None
             gto = GTOAgent(trainer, name="GTO", simulations=80,
-                           opponent_profile=OpponentProfile())
+                           opponent_profile=opp_profile)
             t0 = time.time()
             match = HeadsUpMatch(gto, opp, big_blind=big_blind, seed=seed)
             match_result = match.play(num_hands)
@@ -520,21 +521,27 @@ def main():
     parser.add_argument("--save", type=str, default=None, help="Save results to JSON file")
     parser.add_argument("--no-parallel", action="store_true", help="Disable parallel gauntlet")
     parser.add_argument("--no-opponent-model", action="store_true",
-                        help="Disable opponent model adjustments (pure GTO eval)")
+                        help="Disable opponent model adjustments (default since v11)")
+    parser.add_argument("--opponent-model", action="store_true",
+                        help="Enable opponent model (disabled by default since v11)")
     parser.add_argument("--strategy", type=str, default=None, help="Path to strategy JSON file (default: server/gto/strategy.json)")
     args = parser.parse_args()
 
     if args.quick:
         args.hands = 100
 
-    # Apply opponent model flag
+    # Apply opponent model flag (disabled by default since v11)
     global _USE_OPPONENT_MODEL
-    if args.no_opponent_model:
-        _USE_OPPONENT_MODEL = False
+    if args.opponent_model:
+        _USE_OPPONENT_MODEL = True
 
     run_all = not (args.gauntlet or args.offtree or args.bridge or args.leakage or args.behavioral)
 
     # Load strategy
+    if not args.strategy:
+        print("  [WARN] No --strategy specified. Loading default strategy.json")
+        print("         which may be a 16-action grid model (not B0).")
+        print("         Recommended: --strategy experiments/best/v9_B0_100M_allbots_positive.json")
     print("Loading strategy...")
     t0 = time.time()
     if args.strategy:

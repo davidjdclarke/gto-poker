@@ -63,7 +63,8 @@ def format_num(n):
 def train_with_progress(trainer, iterations, averaging_delay, sampling,
                         phase_schedule_mode=1, allin_dampen_mode=1,
                         adaptive_averaging=0, regret_discount=1.0,
-                        weight_schedule_mode=0, weight_schedule_param=1.0):
+                        weight_schedule_mode=0, weight_schedule_param=1.0,
+                        action_grid_size=0):
     """Train with a tqdm progress bar showing live stats."""
     if not HAS_TQDM:
         print(f"Training {format_num(iterations)} iterations "
@@ -75,7 +76,8 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling,
                       adaptive_averaging=adaptive_averaging,
                       regret_discount=regret_discount,
                       weight_schedule_mode=weight_schedule_mode,
-                      weight_schedule_param=weight_schedule_param)
+                      weight_schedule_param=weight_schedule_param,
+                      action_grid_size=action_grid_size)
         return
 
     engine = "Cython" if HAS_CYTHON and sampling == 'external' else "Python"
@@ -121,6 +123,7 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling,
         regret_discount=regret_discount,
         weight_schedule_mode=weight_schedule_mode,
         weight_schedule_param=weight_schedule_param,
+        action_grid_size=action_grid_size,
     )
 
     bar.close()
@@ -133,7 +136,8 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
                                   sampling, num_workers,
                                   phase_schedule_mode=1, allin_dampen_mode=1,
                                   adaptive_averaging=0, regret_discount=1.0,
-                                  weight_schedule_mode=0, weight_schedule_param=1.0):
+                                  weight_schedule_mode=0, weight_schedule_param=1.0,
+                                  action_grid_size=0):
     """Parallel training with tqdm progress bar."""
     import multiprocessing
     from server.gto.cfr import _parallel_worker, HAS_CYTHON
@@ -149,13 +153,18 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
                       adaptive_averaging=adaptive_averaging,
                       regret_discount=regret_discount,
                       weight_schedule_mode=weight_schedule_mode,
-                      weight_schedule_param=weight_schedule_param)
+                      weight_schedule_param=weight_schedule_param,
+                      action_grid_size=action_grid_size)
         return
 
     warmup_frac = 0.005
     warmup_iters = max(10000, int(iterations * warmup_frac))
     parallel_iters = iterations - warmup_iters
     chunk_size = max(1000, warmup_iters // 100)
+
+    # Set action grid before training
+    if action_grid_size > 0:
+        _cfr_fast.set_action_grid_size(action_grid_size)
 
     # Pre-allocate shared memory
     _cfr_fast.init_pool_shared(2_000_000)
@@ -196,6 +205,7 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
             regret_discount=regret_discount,
             weight_schedule_mode=weight_schedule_mode,
             weight_schedule_param=weight_schedule_param,
+            action_grid_size=action_grid_size,
         )
         done += batch
         elapsed = time.time() - t_start
@@ -226,7 +236,8 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
             args=(w, w_iters, start, averaging_delay, w_seed,
                   phase_schedule_mode, allin_dampen_mode,
                   adaptive_averaging, regret_discount,
-                  weight_schedule_mode, weight_schedule_param))
+                  weight_schedule_mode, weight_schedule_param,
+                  action_grid_size))
         processes.append((p, w_iters))
         p.start()
 
@@ -570,6 +581,7 @@ def main():
     regret_discount = 1.0    # 1.0=CFR+, <1.0=DCFR
     weight_schedule_mode = 0  # 0=linear, 1=exponential, 2=polynomial
     weight_schedule_param = 1.0
+    action_grid_size = 0     # 0=default (Cython uses 16), 13=B0, 16=v9 expanded
     skip_indices = set()
     for i, flag in enumerate(sys.argv[1:], 1):
         if flag == '--workers' and i < len(sys.argv) - 1:
@@ -596,13 +608,16 @@ def main():
             skip_indices.add(i + 1)
         elif flag == '--weight-schedule' and i < len(sys.argv) - 1:
             val = sys.argv[i + 1]
-            weight_schedule_mode = {'linear': 0, 'exponential': 1, 'polynomial': 2}.get(val, 0)
+            weight_schedule_mode = {'linear': 0, 'exponential': 1, 'polynomial': 2, 'scheduled': 3}.get(val, 0)
             skip_indices.add(i + 1)
         elif flag == '--weight-param' and i < len(sys.argv) - 1:
             weight_schedule_param = float(sys.argv[i + 1])
             skip_indices.add(i + 1)
         elif flag == '--gauntlet-interval' and i < len(sys.argv) - 1:
             gauntlet_interval = int(sys.argv[i + 1])
+            skip_indices.add(i + 1)
+        elif flag == '--action-grid' and i < len(sys.argv) - 1:
+            action_grid_size = int(sys.argv[i + 1])
             skip_indices.add(i + 1)
     if num_workers < 1:
         num_workers = 1
@@ -625,7 +640,7 @@ def main():
     dampen_str = 'new (rc==0,0.5x)' if allin_dampen_mode == 1 else 'old (rc<2,0.7x)'
 
     dcfr_str = f"gamma={regret_discount}" if regret_discount < 1.0 else "off (CFR+)"
-    wsched_names = {0: 'linear', 1: 'exponential', 2: 'polynomial'}
+    wsched_names = {0: 'linear', 1: 'exponential', 2: 'polynomial', 3: 'scheduled'}
     wsched_str = wsched_names.get(weight_schedule_mode, 'linear')
     if weight_schedule_mode > 0:
         wsched_str += f'({weight_schedule_param})'
@@ -639,7 +654,9 @@ def main():
     print(f"│  Schedule:   {schedule_str:>10} flop/turn             │")
     print(f"│  All-in:     {dampen_str:>18}       │")
     print(f"│  DCFR:       {dcfr_str:>18}       │")
+    grid_str = str(action_grid_size) if action_grid_size > 0 else 'default'
     print(f"│  Wt sched:   {wsched_str:>18}       │")
+    print(f"│  Grid:       {grid_str:>18}       │")
     print(f"└─────────────────────────────────────────────────┘")
 
     trainer = CFRTrainer()
@@ -672,7 +689,8 @@ def main():
                                          adaptive_averaging=adaptive_averaging,
                                          regret_discount=regret_discount,
                                          weight_schedule_mode=weight_schedule_mode,
-                                         weight_schedule_param=weight_schedule_param)
+                                         weight_schedule_param=weight_schedule_param,
+                                         action_grid_size=action_grid_size)
         else:
             train_with_progress(trainer, n_iters, averaging_delay, sampling,
                                 phase_schedule_mode=phase_schedule_mode,
@@ -680,7 +698,8 @@ def main():
                                 adaptive_averaging=adaptive_averaging,
                                 regret_discount=regret_discount,
                                 weight_schedule_mode=weight_schedule_mode,
-                                weight_schedule_param=weight_schedule_param)
+                                weight_schedule_param=weight_schedule_param,
+                                action_grid_size=action_grid_size)
 
     t_start = time.time()
 

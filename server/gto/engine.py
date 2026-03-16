@@ -23,6 +23,9 @@ from server.gto.cfr import CFRTrainer, STRATEGY_VERSION
 
 logger = logging.getLogger(__name__)
 
+# Default strategy file. NOTE: strategy.json may be a 16-action grid model.
+# For evaluation, use --strategy to specify the correct file explicitly.
+# Recommended: experiments/best/v9_B0_100M_allbots_positive.json (13-action B0)
 STRATEGY_FILE = str(Path(__file__).parent / "strategy.json")
 
 # Global trainer instance

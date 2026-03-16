@@ -35,15 +35,18 @@ poker/
 ├── simulate.py                # Self-play simulation (GTO vs heuristic bots)
 ├── setup_cython.py            # Cython build (-O3 -march=native)
 ├── convergence_study.py       # Exploitability vs iteration analysis
+├── run_toy_validation.py      # v11: Kuhn poker validation for solver dynamics
 │
 ├── server/gto/
 │   ├── cfr.py                 # CFR+ trainer (Python orchestration)
-│   ├── cfr_fast.pyx           # Cython inner loop (~70x speedup)
-│   ├── abstraction.py         # 2D bucketing, action menus, infoset keys
+│   ├── cfr_fast.pyx           # Cython inner loop (~70x speedup, configurable grid)
+│   ├── abstraction.py         # 2D bucketing, action menus, infoset keys, selective actions
 │   ├── equity.py              # E[HS²] evaluation + hand type classifier
 │   ├── engine.py              # Live game bridge (gto_decide entry point)
 │   ├── exploitability.py      # MC best response + audit tools
 │   ├── kuhn.py                # Kuhn poker benchmark (3-card game)
+│   ├── local_refine.py        # v11: local CFR refinement for off-tree actions
+│   ├── board_texture.py       # v11: board texture classification (dry/mono/draw/paired)
 │   └── strategy.json          # Saved strategy (30–40 MB)
 │
 ├── eval_harness/
@@ -291,7 +294,8 @@ venv/bin/python train_gto.py \
     --weight-param 1.001 \        # base for exp, power for polynomial
     --checkpoint-interval 10000000 \ # save checkpoint every N iters
     --checkpoint-eval \           # compute exploitability at checkpoints
-    --checkpoint-gauntlet         # run quick gauntlet at checkpoints
+    --checkpoint-gauntlet \       # run quick gauntlet at checkpoints
+    --action-grid 13              # v11: explicit grid size (13 or 16)
 ```
 
 **Performance:** ~0.03–0.04 ms/iter with Cython (6 workers), ~29 min for 50M iterations total.
@@ -300,9 +304,10 @@ venv/bin/python train_gto.py \
 
 - **CFR+ (default):** `--regret-discount 1.0` — standard regret flooring, no decay
 - **DCFR:** `--regret-discount 0.995` — discount old regrets by gamma each iteration
-- **Weight schedules:** `--weight-schedule linear` (default), `exponential`, `polynomial`
+- **Weight schedules:** `--weight-schedule linear` (default), `exponential`, `polynomial`, `scheduled`
   - Exponential: weight = param^(t-delay). Try `--weight-param 1.001`
   - Polynomial: weight = (t-delay)^param. Try `--weight-param 2.0`
+  - Scheduled (v11): DCFR with time-varying discount. weight = (t/(t+1))^gamma, regret_discount = t^1.5/(t^1.5+1). `--weight-param` sets gamma (default 2.0)
 
 ### Evaluation Diagnostics (v9)
 
@@ -322,30 +327,31 @@ print(format_pain_map(analysis))
 
 ---
 
-## Current State (v10, 2026-03-15)
+## Current State (v11, 2026-03-16)
 
-**Best strategy: v9-B0 (13-action grid, 100M)** — `experiments/best/v9_B0_100M_allbots_positive.json`
-**Best mapping: `confidence_nearest`** (v10 improvement, no retrain)
-**Exploitability: 1.2211 bb/100** (3-seed eval harness)
-**Preflop exploitability:** 1.0204
-**Nodes:** 1,055,003
-**Gauntlet average (nearest):** +28.5 bb/100 (corrected from +677 — see v10 Phase 0 report)
-**Gauntlet average (confidence_nearest):** +225.1 bb/100 (v10 Phase 3 improvement)
+**Best config: B0 + refine mapping** — `experiments/best/v9_B0_100M_allbots_positive.json` with `mapping="refine"`
+**Alternative: poly(2.0) + confidence_nearest** — `experiments/v11_poly2_100M.json`
+**Best mapping: `refine`** (v11: confidence_nearest base + local refinement for off-tree bets)
+**B0 exploitability:** 1.2211 bb/100 | **poly(2.0) exploitability:** 1.2496 bb/100
+**Nodes:** B0: 1,055,003 | poly(2.0): 1,059,640
+**Gauntlet average (B0 + confidence_nearest):** +170.5 bb/100 (corrected baseline with CIs)
+**Gauntlet average (B0 + refine):** +288.3 bb/100 (v11 improvement, +102.4 over conf_nearest)
+**Gauntlet average (poly2 + confidence_nearest):** +227.0 bb/100 (+41.0 over B0)
 
-### Gauntlet Results (V10-corrected, 5k hands, 3 seeds)
+### Gauntlet Results (v11, 5k hands, 3 seeds)
 
-| Bot | nearest | confidence_nearest | Delta |
-|-----|---------|-------------------|-------|
-| NitBot | +119.9 | **+200.3** | +80 |
-| AggroBot | +339.9 | **+444.0** | +104 |
-| OverfoldBot | +6.7 | -3.9 | -11 |
-| CallStationBot | +72.5 | **+73.0** | +1 |
-| DonkBot | +409.6 | **+717.6** | +308 |
-| WeirdSizingBot | -770.9 | **-202.8** | **+568** |
-| PerturbBot | +22.1 | **+347.2** | +325 |
-| **Average** | **+28.5** | **+225.1** | **+197** |
+| Bot | B0 + conf_nearest | B0 + refine | poly2 + conf_nearest |
+|-----|------------------:|------------:|---------------------:|
+| NitBot | +197.8 | +200.3 | +239.6 |
+| AggroBot | +444.0 | +520.0 | +546.8 |
+| OverfoldBot | +20.5 | -3.9 | -40.9 |
+| CallStationBot | +73.0 | +73.0 | +163.7 |
+| DonkBot | +676.4 | +1159.3 | +679.6 |
+| WeirdSizingBot | -291.7 | **-57.4** | -84.6 |
+| PerturbBot | +73.6 | +127.1 | +84.4 |
+| **Average** | **+170.5** | **+288.3** | **+227.0** |
 
-> **Note:** Prior v9 published results (+677 avg) were inflated by 500-hand sample noise and a 16-action grid compatibility bug. See `docs/results/v10_phase0_report.md` for full analysis.
+> **Note:** B0 + conf_nearest column is from the parallel gauntlet (with CIs). B0 + refine and poly2 columns are from sequential head-to-head comparisons. See `docs/results/v11_results_20260315.md` for full analysis including the poly2+refine combo.
 
 ### v10 Experiment Results Summary
 
@@ -359,12 +365,22 @@ print(format_pain_map(analysis))
 
 **DCFR sweep (16-action, 20M):** Tested gamma = {0.999, 0.995}. Both showed exploitability *increasing* from 10M to 20M. DCFR destabilizes convergence on wider action trees. **Verdict: counterproductive for this grid.**
 
+### What changed v10 → v11
+- **Cython grid configurability (A2):** `cfr_fast.pyx` now accepts `action_grid_size` parameter (13 or 16). `set_action_grid_size()` / `get_action_grid_size()` in Cython. `--action-grid` CLI flag in `train_gto.py`. Python/Cython mismatch is now impossible.
+- **OpponentProfile retired (A3):** Default disabled in `run_eval_harness.py`. Use `--opponent-model` flag to re-enable.
+- **confidence_nearest default (C1):** GTOAgent now defaults to `confidence_nearest` mapping instead of `nearest`.
+- **Scheduled DCFR (B2):** New `weight_schedule_mode=3` / `--weight-schedule scheduled` implements time-varying DCFR: regret discount `t^α/(t^α+1)` with α=1.5, strategy weight `(t/(t+1))^γ`.
+- **Local refinement prototype (C2):** `server/gto/local_refine.py` — mini-CFR at off-tree decision points. New `"refine"` mapping mode in GTOAgent. Trigger policy with bridge-pain integration.
+- **Toy-game validation (B3):** `run_toy_validation.py` — validates all solver dynamics variants on Kuhn Poker before HUNL.
+- **Board texture (D3):** `server/gto/board_texture.py` — classifies boards as dry/monotone/draw-heavy/paired/connected. Auxiliary signal for confidence blending.
+- **Selective action additions (D1):** `add_selective_action()` / `clear_selective_actions()` in `abstraction.py` — adds actions to specific postflop contexts without expanding the entire grid.
+- **Configurable equity buckets (D2):** `set_equity_buckets()` in `abstraction.py` — supports 9-bucket experiments.
+
 ### What changed v9 → v10
 - **Bugs fixed:** 16-action grid compatibility bug, OpponentProfile regression
 - **New mapping:** `confidence_nearest` (+225.1 avg vs +28.5 for `nearest`)
 - **Tooling:** Multi-seed gauntlet with CIs, Phase 0 validation script, grid auto-detection
 - **Evaluation corrected:** Published +677 avg corrected to +28.5 (nearest) / +225.1 (confidence_nearest)
-- **Phase 2 in progress:** Exponential weight schedule training at 100M iterations
 
 ### What changed v7 → v9-B0
 - **Training config:** 2x phase schedule (was 3x), old all-in dampening, 100M iterations (was 67M)
@@ -377,15 +393,15 @@ print(format_pain_map(analysis))
 
 | Issue | Severity | Description | Status |
 |-------|----------|-------------|--------|
-| WeirdSizingBot -203 | Medium | Still weakest matchup even with confidence_nearest | Need local refinement (V10-B2) |
-| 16-action grid 15% coverage | High | Only 15% of nodes well-visited at 200M | Needs Cython grid config or selective expansion |
-| OpponentProfile counterproductive | Medium | Hurts performance, especially vs CallStation | Disabled; needs redesign |
+| WeirdSizingBot -203 | Medium | Still weakest matchup even with confidence_nearest | Local refinement prototype in place (v11 C2) |
+| 16-action grid 15% coverage | High | Only 15% of nodes well-visited at 200M | Selective expansion available (v11 D1) |
+| OpponentProfile counterproductive | ~~Medium~~ **RETIRED** | Hurts performance, especially vs CallStation | Disabled by default (v11 A3) |
 | EQ0 river 100% bet | Low | Specific EQ0 nodes still 100% bet on river | Structural abstraction limit |
-| Cython hardcodes 16-action | Medium | Can't train 13-action grid with Cython | Need configurable action grid in Cython |
+| Cython hardcodes 16-action | ~~Medium~~ **FIXED** | Can't train 13-action grid with Cython | Configurable via `set_action_grid_size()` (v11 A2) |
 | 16-action grid bug | ~~Critical~~ **FIXED** | `_postflop_actions()` broke 13-action B0 eval | Grid auto-detection added (v10) |
 | Published v9 results inflated | ~~Critical~~ **FIXED** | +677 avg was from 500-hand noise + grid bug | Corrected to +28.5 nearest / +225 conf_nearest |
 
-Full details: `docs/results/v10_complete_report.md`, `docs/results/v10_phase0_report.md`
+Full details: `docs/results/v11_results_20260315.md`, `docs/results/v10_complete_report.md`
 
 ---
 
@@ -396,7 +412,9 @@ Full details: `docs/results/v10_complete_report.md`, `docs/results/v10_phase0_re
 Each results doc should include: exploitability, gauntlet table, bridge mapping A/B, off-tree stress test, strategy audit, and a comparison to the previous iteration. This creates a historical record of how the strategy evolves over time.
 
 Existing results:
-- `docs/results/v10_complete_report.md` — **v10 definitive report**: corrected baseline, confidence mapping, full analysis
+- `docs/results/v11_results_20260315.md` — **v11 results**: local refinement, solver dynamics, selective abstraction
+- `docs/results/v11_baseline_report.md` — v11 baseline template and configuration
+- `docs/results/v10_complete_report.md` — v10 definitive report: corrected baseline, confidence mapping, full analysis
 - `docs/results/v10_phase0_report.md` — v10 Phase 0: bugs found, corrected gauntlet, cliff analysis
 - `docs/results/v9_complete_report.md` — v9 definitive report: B0 baseline, DCFR sweep, 16-action grid
 - `docs/results/v9_B0_100M_20260314.md` — v9-B0 baseline detail (results now known to be inflated)
@@ -408,7 +426,8 @@ Existing results:
 **Before starting a new improvement cycle, create an action plan in `docs/plans/`** describing the goals, hypotheses, and planned changes. Update the plan as work progresses. This provides a decision log for why changes were made.
 
 Existing plans:
-- `docs/plans/ACTION_PLAN_v10.md` — v10 research plan (current)
+- `docs/plans/ACTION_PLAN_v11.md` — v11 research plan (current)
+- `docs/plans/ACTION_PLAN_v10.md` — v10 research plan
 - `docs/plans/ACTION_PLAN_v9.md` — v9 improvement plan
 - `docs/plans/ACTION_PLAN_v8_ablations.md` — v8 ablation study plan
 - `docs/plans/ACTION_PLAN_v7.md` — v7 improvement plan
@@ -502,10 +521,16 @@ strategy = trainer.get_strategy('preflop', 0, (Action.OPEN_RAISE,), 'ip')
 
 6. **Postflop pot = 1.0 normalized**: All bet sizings in the solver are fractions of the normalized pot. The engine translates to real chips. `inv = [0.5, 0.5]` means each player has contributed 0.5 to a pot of 1.0.
 
-7. **`confidence_nearest` is the recommended mapping**: GTOAgent default is `"nearest"` but `"confidence_nearest"` (+225.1 avg) outperforms it (+28.5 avg) by blending with equity heuristic when facing off-tree bets. Use `confidence_nearest` for all evaluation.
+7. **`refine` is the recommended mapping (v11)**: Layers mini-CFR solve on top of `confidence_nearest` for extreme off-tree bets. B0+refine achieves +288.3 avg vs +186.0 for confidence_nearest alone (+102.4 improvement, zero regressions). GTOAgent default is `"confidence_nearest"` — pass `mapping="refine"` for best results.
 
 8. **Action grid auto-detection is required**: When loading a strategy, call `detect_action_grid_from_strategy()` and `set_action_grid()`. The B0 strategy uses a 13-action grid; the Cython trainer creates 16-action nodes. Mismatched grids cause ~45% lookup failures. `get_trainer()` in engine.py handles this automatically.
 
 9. **OpponentProfile is disabled for evaluation**: The `OpponentProfile` model was found counterproductive (v10 Phase 0). Use `--no-opponent-model` flag or pass `opponent_profile=None` to GTOAgent for accurate results. The OP model needs redesign before it's useful.
 
-10. **Cython action grid is independent**: `cfr_fast.pyx` has its own hardcoded action menus, separate from `abstraction.py`'s `get_available_actions()`. Changing the Python grid doesn't affect training. Need Cython rebuild for training grid changes.
+10. **Cython action grid is now configurable (v11)**: Call `cfr_fast.set_action_grid_size(13)` or `cfr_fast.set_action_grid_size(16)` before training. The `train_fast()` function also accepts `action_grid_size` parameter. `train_gto.py --action-grid 13` does this automatically. Python's `set_action_grid()` and Cython's `set_action_grid_size()` must agree.
+
+11. **Local refinement is heuristic, not safe**: `local_refine.py` approximates subgame solving with a simplified payoff model. It's a prototype for evaluation, not a theoretically safe implementation. Use `"refine"` mapping in GTOAgent to enable it.
+
+12. **Selective actions don't affect existing strategies**: `add_selective_action()` adds actions to the Python action menu only. Existing strategy files won't have nodes for the new actions, so lookups will miss and use uniform. Must retrain to populate the new nodes.
+
+13. **OpponentProfile is disabled by default since v11**: The `--opponent-model` flag re-enables it. `--no-opponent-model` is still accepted but is now a no-op.

@@ -85,8 +85,20 @@ class HandType(IntEnum):
 
 
 NUM_HAND_TYPES = len(HandType)
-NUM_EQUITY_BUCKETS = 8   # Equity dimension of 2D bucket
+NUM_EQUITY_BUCKETS = 8   # Equity dimension of 2D bucket (default; v11 D2 tests 9)
 NUM_BUCKETS = NUM_EQUITY_BUCKETS * NUM_HAND_TYPES  # Total bucket count
+
+
+def set_equity_buckets(n: int) -> None:
+    """Set the number of equity buckets (v11 D2 experiment).
+
+    WARNING: Changing this invalidates all existing strategies.
+    Must retrain from scratch after changing.
+    """
+    global NUM_EQUITY_BUCKETS, NUM_BUCKETS
+    assert 4 <= n <= 16, f"Equity buckets must be 4-16, got {n}"
+    NUM_EQUITY_BUCKETS = n
+    NUM_BUCKETS = NUM_EQUITY_BUCKETS * NUM_HAND_TYPES
 
 
 def classify_hand_type(rank1: int, rank2: int, suited: bool) -> HandType:
@@ -196,6 +208,41 @@ class InfoSet:
 # Set via set_action_grid() or detect_action_grid_from_strategy()
 _ACTION_GRID_SIZE = 13  # Default to 13-action for backward compatibility
 
+# Selective action additions (v11 D1): extra actions in specific contexts
+# Format: {(phase, context): [Action, ...]}
+# context: 'facing_bet' or 'no_bet'
+# These are added on top of the base grid actions.
+_SELECTIVE_ACTIONS: dict[tuple[str, str], list] = {}
+
+
+def add_selective_action(phase: str, context: str, action) -> None:
+    """Register a selective action addition for specific contexts.
+
+    This allows adding a single action (e.g., BET_THREE_QUARTER_POT) in
+    specific postflop contexts without expanding the entire grid.
+
+    Args:
+        phase: 'flop', 'turn', or 'river'
+        context: 'facing_bet' or 'no_bet'
+        action: Action enum value to add
+    """
+    key = (phase, context)
+    if key not in _SELECTIVE_ACTIONS:
+        _SELECTIVE_ACTIONS[key] = []
+    if action not in _SELECTIVE_ACTIONS[key]:
+        _SELECTIVE_ACTIONS[key].append(action)
+
+
+def clear_selective_actions() -> None:
+    """Remove all selective action additions."""
+    _SELECTIVE_ACTIONS.clear()
+
+
+def get_selective_actions(phase: str, has_bet: bool) -> list:
+    """Get any selective actions registered for this context."""
+    context = 'facing_bet' if has_bet else 'no_bet'
+    return list(_SELECTIVE_ACTIONS.get((phase, context), []))
+
 
 def set_action_grid(size: int) -> None:
     """Set the action grid size (13 or 16)."""
@@ -250,7 +297,8 @@ def get_available_actions(has_bet_to_call: bool, can_raise: bool,
             history_len == 0 and
             not has_bet_to_call
         )
-        return _postflop_actions(has_bet_to_call, can_raise, is_donk_eligible)
+        return _postflop_actions(has_bet_to_call, can_raise, is_donk_eligible,
+                                 phase=phase)
 
 
 def _preflop_actions(has_bet_to_call: bool, can_raise: bool,
@@ -300,12 +348,14 @@ def _preflop_actions(has_bet_to_call: bool, can_raise: bool,
 
 
 def _postflop_actions(has_bet_to_call: bool, can_raise: bool,
-                      is_donk_eligible: bool = False) -> list[Action]:
+                      is_donk_eligible: bool = False,
+                      phase: str | None = None) -> list[Action]:
     """Postflop action abstraction with pot-fraction sizing.
 
     v6: Added 2/3 pot, overbet (1.25x pot), and donk-bet branches.
     Donk bets available on flop/turn first action (OOP leading).
     Grid mode 16 adds: quarter pot, 3/4 pot, double pot (v9 expansion).
+    v11: Selective action additions via _SELECTIVE_ACTIONS.
     """
     if has_bet_to_call:
         actions = [Action.FOLD, Action.CHECK_CALL]
@@ -330,6 +380,20 @@ def _postflop_actions(has_bet_to_call: bool, can_raise: bool,
             actions.extend([Action.BET_THIRD_POT, Action.BET_HALF_POT,
                             Action.BET_TWO_THIRDS_POT, Action.BET_POT,
                             Action.BET_OVERBET, Action.ALL_IN])
+
+        # v11 D1: selective action additions
+        if phase and _SELECTIVE_ACTIONS:
+            selective = get_selective_actions(phase, has_bet_to_call)
+            for sa in selective:
+                if sa not in actions:
+                    # Insert in sorted position (by action value)
+                    # before ALL_IN
+                    idx = len(actions) - 1  # before last (ALL_IN)
+                    for j, a in enumerate(actions):
+                        if int(a) > int(sa):
+                            idx = j
+                            break
+                    actions.insert(idx, sa)
 
     return actions
 
