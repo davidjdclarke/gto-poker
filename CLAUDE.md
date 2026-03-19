@@ -352,7 +352,7 @@ print(format_pain_map(analysis))
 
 **BLUEPRINT DECISION: EMD+texture + pseudo_harmonic (NEW)** — `experiments/best/v13_EMD_texture_400M.json` with `mapping="pseudo_harmonic"` and `--emd-texture` flag
 **Previous best: B0 + pseudo_harmonic** — `experiments/best/v9_B0_100M_allbots_positive.json` with `mapping="pseudo_harmonic"`
-**Best mapping: `embedding_ph`** (v13 WS5b: embedding bucket interpolation + pseudo_harmonic action interpolation + confidence blending)
+**Best mapping (EMD+texture): `pseudo_harmonic`** | **Best mapping (B0): `embedding_ph`** (v13 WS5b: embedding bucket interpolation + pseudo_harmonic action interpolation + confidence blending)
 **EMD+texture exploitability:** 1.3279 bb/100 (400M iters, 6.3M nodes) | **B0 exploitability:** 1.2211 bb/100 (100M iters, 1.05M nodes)
 **Gauntlet average (EMD+texture + pseudo_harmonic):** +358.6 bb/100 classic (5k hands × 3 seeds)
 **H2H vs B0:** +1846.9 ± 132.0 bb/100 (5k × 3 seeds, all seeds positive)
@@ -404,7 +404,11 @@ print(format_pain_map(analysis))
 | PerturbBot | +176.5 | +317.8 | **+236.4** |
 | **Average** | **+212.0** | +187.1 | **+254.1** |
 
-> **WS5b result:** `embedding_ph` K=3 achieves +254.1 bb/100 (+42.1 over pseudo_harmonic, +20%). All 7 bots positive. The composition of embedding bucket interpolation (smooths bucket boundaries) + pseudo_harmonic action interpolation (handles off-tree bets) + confidence blending (low-visit fallback) is strictly better than any single mapping. Embedding alone regresses on WeirdSizingBot (-211) because it doesn't handle action translation; adding pseudo_harmonic on top fixes it (+100.2). Model: 50k training samples, 21→32→16→120 MLP, 74% bucket classification accuracy, trained in <2 min. Use `--mapping embedding_ph --embedding-model server/gto/embedding_weights.json --embedding-k 3`.
+> **WS5b result (B0):** `embedding_ph` K=3 achieves +254.1 bb/100 (+42.1 over pseudo_harmonic, +20%). All 7 bots positive. The composition of embedding bucket interpolation (smooths bucket boundaries) + pseudo_harmonic action interpolation (handles off-tree bets) + confidence blending (low-visit fallback) is strictly better than any single mapping on B0.
+>
+> **WS5b result (EMD+texture):** `embedding_ph` K=3 achieves +326.3 bb/100 (-32.3 vs pseudo_harmonic's +358.6). The EMD abstraction already provides smooth bucket boundaries, so embedding interpolation adds less value while 52.9% classification accuracy (180 classes) introduces noise. CallStationBot +589.5 (+215 improvement) and WeirdSizingBot +220.5 (+45) still benefit, but PerturbBot regresses -264. **`pseudo_harmonic` remains best for EMD+texture.**
+>
+> **Conclusion:** Embedding interpolation helps models with coarse discrete buckets (B0: 120 uniform bins) but not models with distribution-based clustering (EMD: 12 histogram clusters). The production baseline remains **EMD+texture + pseudo_harmonic at +358.6 bb/100**.
 
 ### AIVAT Limitation Note
 

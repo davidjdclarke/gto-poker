@@ -75,8 +75,8 @@ def main():
     if args.emd_texture:
         from server.gto.abstraction import enable_emd_mode
         enable_emd_mode()
-        from server.gto.equity import enable_emd_equity
-        enable_emd_equity()
+        import server.gto.equity as _eq
+        _eq.EMD_MODE_ENABLED = True
 
     from server.gto.abstraction import NUM_BUCKETS
 
