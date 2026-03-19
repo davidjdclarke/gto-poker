@@ -30,6 +30,10 @@ dcfr_sweep/
 # Large strategy files in experiments (170MB each)
 experiments/best/
 experiments/ablations/*/strategy.json
+experiments/v11_poly2_100M.json
+
+# Embedding training data caches (large binary)
+*.npz
 
 # Cython generated
 server/gto/cfr_fast.c

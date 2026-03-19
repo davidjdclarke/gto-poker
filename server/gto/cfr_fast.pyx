@@ -360,6 +360,8 @@ cdef struct NodeData:
     int first_visit_iter   # iteration when this node was first visited (-1 = unvisited)
     double regret_sum[16]
     double strategy_sum[16]
+    double prev_regret[16]  # WS2a PCFR+: previous iteration's instantaneous regret
+    double baseline[16]     # WS2b VR-MCCFR: per-action baseline for variance reduction
 
 
 cdef void node_get_strategy(NodeData* node, double* out_strategy) noexcept nogil:
@@ -382,11 +384,26 @@ cdef void node_get_strategy(NodeData* node, double* out_strategy) noexcept nogil
 
 cdef void node_update_regrets(NodeData* node, double* regrets,
                                double discount) noexcept nogil:
+    """Update cumulative regrets with optional DCFR discounting and CFR+ flooring.
+
+    WS2a PCFR+ (solver_mode=1): subtract previous instantaneous regret as an
+    optimistic prediction term. Achieves T^{-1} convergence vs CFR+'s T^{-1/2}.
+    Farina, Kroer & Sandholm (NeurIPS 2020).
+    """
     cdef int i
+    cdef double corrected
     for i in range(node.num_actions):
         if discount < 1.0:
             node.regret_sum[i] *= discount
-        node.regret_sum[i] += regrets[i]
+        if _solver_mode == 1:
+            # PCFR+: R[t+1](a) = max(R[t](a) + r[t](a) - r_hat[t](a), 0)
+            # where r_hat[t](a) = r[t-1](a) (last iter's instantaneous regret)
+            corrected = regrets[i] - node.prev_regret[i]
+            node.regret_sum[i] += corrected
+            node.prev_regret[i] = regrets[i]  # store for next iteration
+        else:
+            # CFR+: R[t+1](a) = max(R[t](a) + r[t](a), 0)
+            node.regret_sum[i] += regrets[i]
         if node.regret_sum[i] < 0:
             node.regret_sum[i] = 0.0
 
@@ -432,16 +449,20 @@ cdef int PHASE_TURN = 2
 cdef int PHASE_RIVER = 3
 
 cdef inline long long make_key(int phase, int position, int bucket,
-                                int* history, int hlen) noexcept nogil:
+                                int* history, int hlen,
+                                int texture=0) noexcept nogil:
     """
     Encode infoset key as 64-bit int.
-    Layout: phase(2) | position(1) | bucket(8) | history(hlen*4) | hlen(4)
+    Layout (standard): phase(2) | position(1) | bucket(8) | history(hlen*4) | hlen(4)
+    Layout (EMD mode): phase(2) | position(1) | bucket(8) | texture(2) | history(hlen*4) | hlen(4)
     """
     cdef long long key = 0
     cdef int i
     key = phase
     key = (key << 1) | position
     key = (key << 8) | bucket
+    if _emd_mode >= 1:
+        key = (key << 2) | (texture & 3)
     for i in range(hlen):
         key = (key << 4) | history[i]
     key = (key << 4) | hlen
@@ -487,6 +508,16 @@ cdef int _global_averaging_delay = 0  # global averaging delay (set by train_fas
 cdef double _regret_discount = 1.0     # 1.0=CFR+, <1.0=DCFR (e.g. 0.995)
 cdef int _weight_schedule_mode = 0     # 0=linear, 1=exponential, 2=polynomial
 cdef double _weight_schedule_param = 1.0  # base for exp, power for polynomial
+
+# --- Solver mode (set by train_fast) ---
+cdef int _solver_mode = 0  # 0=CFR+ (default), 1=PCFR+ (optimistic regret updates)
+
+# --- VR-MCCFR variance reduction (WS2b, Schmid et al. AAAI 2019) ---
+cdef int _vr_mccfr = 0  # 0=off, 1=on (use baselines at opponent nodes)
+
+# --- Zhang 2026 schedule parameters (WS2c) ---
+cdef double _zhang_alpha = 1.5   # regret discount exponent: discount = t^α / (t^α + c)
+cdef double _zhang_c = 1.0       # discount constant
 
 
 def init_progress_counters(int num_workers):
@@ -559,6 +590,8 @@ cdef int get_or_create_node(long long key, int num_actions) noexcept:
     for i in range(16):
         node_pool[idx].regret_sum[i] = 0.0
         node_pool[idx].strategy_sum[i] = 0.0
+        node_pool[idx].prev_regret[i] = 0.0  # WS2a: PCFR+ prediction buffer
+        node_pool[idx].baseline[i] = 0.0    # WS2b: VR-MCCFR baseline
 
     node_index[key] = idx
     node_count += 1
@@ -745,6 +778,12 @@ def sync_selective_actions_from_python():
 cdef int NUM_HAND_TYPES_C = 15
 cdef int NUM_EQUITY_BUCKETS_C = 8
 cdef int NUM_BUCKETS_C = 120
+cdef int NUM_TEXTURES_C = 4
+cdef int _emd_mode = 0  # WS4+WS5: 0=off (120 buckets), 1=on (180 buckets + texture)
+
+# WS5: per-iteration texture values (set before cfr_single_street calls)
+cdef int _texture_p0 = 0
+cdef int _texture_p1 = 0
 
 
 # --- Core CFR traversal (external sampling) ---
@@ -774,6 +813,7 @@ cdef double cfr_single_street(int phase, int bucket_p0, int bucket_p1,
     cdef double regrets[16]
     cdef double node_weight
     cdef int node_delay
+    cdef double v_sampled, v_corrected, sign
 
     # Fold terminal
     terminal_val = check_terminal_value(history, hlen, bucket_p0, bucket_p1, phase == PHASE_PREFLOP)
@@ -801,7 +841,8 @@ cdef double cfr_single_street(int phase, int bucket_p0, int bucket_p1,
     cr_bool = rc < 4
 
     num_actions = get_actions(hb, cr_bool, is_pf, rc, hlen, phase, bucket, actions)
-    key = make_key(phase, position, bucket, history, hlen)
+    cdef int tex = _texture_p0 if acting_player == 0 else _texture_p1
+    key = make_key(phase, position, bucket, history, hlen, tex)
     node_idx = get_or_create_node(key, num_actions)
 
     # Track first visit and compute per-node weight if adaptive averaging
@@ -830,6 +871,28 @@ cdef double cfr_single_street(int phase, int bucket_p0, int bucket_p1,
         # Opponent: sample one action
         action_idx = sample_action(strategy, num_actions)
         new_history[hlen] = actions[action_idx]
+
+        if _vr_mccfr == 1 and node_idx >= 0:
+            # WS2b VR-MCCFR: use baselines to reduce sampling variance.
+            # Schmid et al. (AAAI 2019): v_vr = Σ σ(a)*b(a) + (v(j) - b(j))
+            # Baselines stored in P0's perspective; flip sign for P1 traverser.
+            # NOTE: read baselines BEFORE recursion — _grow_pool() can
+            # realloc node_pool, invalidating any cached NodeData* pointer.
+            sign = 1.0 if traverser == 0 else -1.0
+            v_corrected = 0.0
+            for i in range(num_actions):
+                v_corrected += strategy[i] * sign * node_pool[node_idx].baseline[i]
+            baseline_sampled = sign * node_pool[node_idx].baseline[action_idx]
+            v_sampled = cfr_single_street(phase, bucket_p0, bucket_p1,
+                                           new_history, hlen + 1,
+                                           traverser, weight,
+                                           buckets_p0, buckets_p1)
+            v_corrected += v_sampled - baseline_sampled
+            # Update baseline for sampled action (store in P0's perspective)
+            # Re-index node_pool since it may have been reallocated during recursion
+            node_pool[node_idx].baseline[action_idx] = sign * v_sampled
+            return v_corrected
+
         return cfr_single_street(phase, bucket_p0, bucket_p1,
                                   new_history, hlen + 1,
                                   traverser, weight,
@@ -916,7 +979,8 @@ cdef double evaluate_street(int phase, int bucket_p0, int bucket_p1,
     cr_bool = rc < 4
 
     num_actions = get_actions(hb, cr_bool, is_pf, rc, hlen, phase, bucket, actions)
-    key = make_key(phase, position, bucket, history, hlen)
+    tex2 = _texture_p0 if acting_player == 0 else _texture_p1
+    key = make_key(phase, position, bucket, history, hlen, tex2)
 
     if key in node_index:
         node_idx = node_index[key]
@@ -960,8 +1024,8 @@ cdef double continuation_value(int phase, int bucket_p0, int bucket_p1,
 
 # --- Bucket sampling (C-level) ---
 
-cdef void sample_street_buckets(int* out_buckets) noexcept nogil:
-    """Sample buckets for all 4 streets."""
+cdef void sample_street_buckets(int* out_buckets, int* out_textures) noexcept nogil:
+    """Sample buckets and textures for all 4 streets."""
     cdef int hand_type = rand_int(NUM_HAND_TYPES_C)
     cdef int eq = rand_int(NUM_EQUITY_BUCKETS_C)
     cdef int drift_r
@@ -969,6 +1033,12 @@ cdef void sample_street_buckets(int* out_buckets) noexcept nogil:
 
     for i in range(4):
         out_buckets[i] = eq * NUM_HAND_TYPES_C + hand_type
+        # WS5: sample random texture for postflop streets (preflop = 0)
+        # emd_mode 1 = EMD-only (no texture), emd_mode 2 = EMD+texture
+        if _emd_mode == 2 and i > 0:
+            out_textures[i] = rand_int(NUM_TEXTURES_C)
+        else:
+            out_textures[i] = 0
         drift_r = rand_int(4)
         if drift_r == 0:
             eq = eq - 1 if eq > 0 else 0
@@ -982,7 +1052,10 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
                unsigned int seed=42, int phase_schedule_mode=1,
                int allin_dampen_mode=1, int adaptive_averaging=0,
                double regret_discount=1.0, int weight_schedule_mode=0,
-               double weight_schedule_param=1.0, int action_grid_size=0):
+               double weight_schedule_param=1.0, int action_grid_size=0,
+               int solver_mode=0, int vr_mccfr=0,
+               double zhang_alpha=1.5, double zhang_c=1.0,
+               int vr_mccfr_warmup=0, int emd_mode=0):
     """
     Run CFR+ training entirely in Cython.
 
@@ -994,16 +1067,24 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
         allin_dampen_mode: 0=old (rc<2, 0.7x), 1=new (rc==0, 0.5x, default)
         adaptive_averaging: 0=global delay (default), 1=per-node adaptive delay
         regret_discount: DCFR discount (1.0=CFR+, <1.0=DCFR)
-        weight_schedule_mode: 0=linear, 1=exponential, 2=polynomial
-        weight_schedule_param: parameter for weight schedule
+        weight_schedule_mode: 0=linear, 1=exponential, 2=polynomial, 3=scheduled,
+                              4=zhang2026 (automated schedule)
+        weight_schedule_param: base for exp, power for polynomial, beta for zhang
         action_grid_size: 0=use current setting, 13=v6/B0 grid, 16=v9 expanded
+        solver_mode: 0=CFR+ (default), 1=PCFR+ (optimistic, T^{-1} convergence)
+        vr_mccfr: 0=off, 1=on (WS2b variance reduction baselines)
+        zhang_alpha: Zhang 2026 regret discount exponent (default 1.5)
+        zhang_c: Zhang 2026 discount constant (default 1.0)
+        vr_mccfr_warmup: iterations of standard CFR+ before activating VR-MCCFR
+                         baselines (0=immediate, >0=delayed activation)
 
     Returns total iterations completed.
     """
     global _allin_dampen_mode, _phase_schedule_mode, _adaptive_averaging
     global _current_iter, _global_averaging_delay
     global _regret_discount, _weight_schedule_mode, _weight_schedule_param
-    global _action_grid_size
+    global _action_grid_size, _solver_mode, _vr_mccfr
+    global _zhang_alpha, _zhang_c
     _allin_dampen_mode = allin_dampen_mode
     _phase_schedule_mode = phase_schedule_mode
     _adaptive_averaging = adaptive_averaging
@@ -1011,6 +1092,22 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
     _regret_discount = regret_discount
     _weight_schedule_mode = weight_schedule_mode
     _weight_schedule_param = weight_schedule_param
+    _solver_mode = solver_mode  # WS2a: 0=CFR+, 1=PCFR+
+    # WS2b: delayed activation — start with standard CFR+, flip on after warmup
+    _vr_mccfr = 0 if (vr_mccfr == 1 and vr_mccfr_warmup > 0) else vr_mccfr
+    # WS4+WS5: EMD mode (1=EMD-only K=12, 2=EMD+texture K=12×4textures)
+    global _emd_mode, NUM_EQUITY_BUCKETS_C, NUM_BUCKETS_C, _texture_p0, _texture_p1
+    _emd_mode = emd_mode
+    if emd_mode >= 1:
+        NUM_EQUITY_BUCKETS_C = 12
+        NUM_BUCKETS_C = 12 * NUM_HAND_TYPES_C
+    else:
+        NUM_EQUITY_BUCKETS_C = 8
+        NUM_BUCKETS_C = 8 * NUM_HAND_TYPES_C
+    _texture_p0 = 0
+    _texture_p1 = 0
+    _zhang_alpha = zhang_alpha  # WS2c: regret discount exponent
+    _zhang_c = zhang_c  # WS2c: discount constant
     if action_grid_size > 0:
         if action_grid_size not in (13, 16):
             raise ValueError(f"Invalid action_grid_size: {action_grid_size}")
@@ -1020,6 +1117,8 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
 
     cdef int buckets_p0[4]
     cdef int buckets_p1[4]
+    cdef int textures_p0[4]
+    cdef int textures_p1[4]
     cdef int empty_history[1]
     cdef int t, phase, traverser
     cdef double weight
@@ -1054,10 +1153,21 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
     cdef double alpha_dcfr = 1.5   # positive regret discount exponent
     cdef double gamma_dcfr = _weight_schedule_param if _weight_schedule_mode == 3 else 2.0
     cdef double t_ratio
+    # WS2c: Zhang 2026 schedule vars
+    cdef double zhang_t_pow_alpha
+
+    # WS2b: track whether we need delayed VR-MCCFR activation
+    cdef int vr_mccfr_target = vr_mccfr
+    cdef int vr_warmup_iter = start_iter + vr_mccfr_warmup if vr_mccfr_warmup > 0 else 0
 
     for i in range(num_iterations):
         t = start_iter + i + 1
         _current_iter = t
+
+        # WS2b: activate VR-MCCFR after warmup period
+        if vr_mccfr_target == 1 and _vr_mccfr == 0 and t >= vr_warmup_iter:
+            _vr_mccfr = 1
+
         # Compute strategy accumulation weight based on schedule mode
         if t <= averaging_delay:
             weight = 0.0
@@ -1075,17 +1185,29 @@ def train_fast(int num_iterations, int start_iter=0, int averaging_delay=0,
             # Time-varying regret discount: t^alpha / (t^alpha + 1)
             # Approaches 1.0 as t grows (less discounting over time)
             _regret_discount = (<double>t ** alpha_dcfr) / (<double>t ** alpha_dcfr + 1.0)
+        elif _weight_schedule_mode == 4:
+            # WS2c: Zhang, McAleer & Sandholm (AAAI 2026) automated schedule
+            # discount[t] = t^alpha / (t^alpha + c)
+            # weight[t]   = t^beta
+            # Parameters alpha, beta, c found via small-game sweep (Kuhn/Leduc).
+            zhang_t_pow_alpha = (<double>t) ** _zhang_alpha
+            _regret_discount = zhang_t_pow_alpha / (zhang_t_pow_alpha + _zhang_c)
+            weight = (<double>(t - averaging_delay)) ** _weight_schedule_param
         else:
             # Linear (default): t - delay
             weight = <double>(t - averaging_delay)
 
         for s in range(schedule_len):
             phase = phase_schedule[s]
-            sample_street_buckets(buckets_p0)
-            sample_street_buckets(buckets_p1)
+            sample_street_buckets(buckets_p0, textures_p0)
+            sample_street_buckets(buckets_p1, textures_p1)
 
             b0 = buckets_p0[phase]
             b1 = buckets_p1[phase]
+
+            # WS5: set per-iteration texture globals for cfr_single_street
+            _texture_p0 = textures_p0[phase]
+            _texture_p1 = textures_p1[phase]
 
             for traverser in range(2):
                 cfr_single_street(phase, b0, b1,
@@ -1150,7 +1272,7 @@ def import_nodes(nodes_dict):
         node_count += 1
 
 
-def get_strategy_fast(int phase, int bucket, tuple history, str position=''):
+def get_strategy_fast(int phase, int bucket, tuple history, str position='', int texture=0):
     """Look up trained strategy. Returns dict {action: prob}."""
     cdef int hlen = len(history)
     cdef int c_history[12]
@@ -1175,7 +1297,7 @@ def get_strategy_fast(int phase, int bucket, tuple history, str position=''):
     cr_bool = rc < 4
 
     num_actions = get_actions(hb, cr_bool, is_pf, rc, hlen, phase, bucket, actions)
-    key = make_key(phase, pos, bucket, c_history, hlen)
+    key = make_key(phase, pos, bucket, c_history, hlen, texture)
 
     if key in node_index:
         node_idx = node_index[key]

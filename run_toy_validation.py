@@ -147,6 +147,46 @@ def compute_exploitability(trainer) -> float:
     return (br0 + br1) / 2.0
 
 
+class Zhang2026KuhnTrainer(ScheduledKuhnTrainer):
+    """Kuhn CFR trainer with Zhang et al. (AAAI 2026) automated schedule.
+
+    discount[t] = t^alpha / (t^alpha + c)
+    weight[t]   = t^beta
+    """
+
+    def __init__(self, alpha: float = 1.5, beta: float = 2.0, c: float = 1.0):
+        super().__init__(weight_mode='zhang2026', weight_param=beta, regret_discount=1.0)
+        self.zhang_alpha = alpha
+        self.zhang_beta = beta
+        self.zhang_c = c
+
+    def train(self, num_iterations: int) -> list[float]:
+        game_values = []
+        deals = self.game.all_card_deals()
+        delay = num_iterations // 4
+
+        for i in range(num_iterations):
+            t = self.iterations + i + 1
+
+            # Zhang 2026 schedule
+            t_pow_alpha = t ** self.zhang_alpha
+            self.regret_discount = t_pow_alpha / (t_pow_alpha + self.zhang_c)
+
+            if t <= delay:
+                weight = 0.0
+            else:
+                weight = (t - delay) ** self.zhang_beta
+
+            iter_value = 0.0
+            for cards in deals:
+                iter_value += self._cfr_scheduled(cards, (), 1.0, 1.0, weight)
+            iter_value /= len(deals)
+            game_values.append(iter_value)
+            self.iterations += 1
+
+        return game_values
+
+
 def run_validation(num_iterations: int = 20000, save_plot: bool = False):
     """Run all schedule variants on Kuhn Poker and compare convergence."""
     configs = [
@@ -157,6 +197,15 @@ def run_validation(num_iterations: int = 20000, save_plot: bool = False):
         ('scheduled(2.0)', 'scheduled', 2.0, 1.0),
         ('scheduled(3.0)', 'scheduled', 3.0, 1.0),
         ('DCFR(0.995)', 'linear', 1.0, 0.995),
+    ]
+    # WS2c: Zhang 2026 schedule configs — sweep alpha, beta, c
+    zhang_configs = [
+        ('zhang(1.5,2.0,1)', 1.5, 2.0, 1.0),
+        ('zhang(2.0,2.0,1)', 2.0, 2.0, 1.0),
+        ('zhang(1.5,2.0,10)', 1.5, 2.0, 10.0),
+        ('zhang(2.0,3.0,1)', 2.0, 3.0, 1.0),
+        ('zhang(1.5,3.0,10)', 1.5, 3.0, 10.0),
+        ('zhang(3.0,2.0,1)', 3.0, 2.0, 1.0),
     ]
 
     print(f"{'='*70}")
@@ -182,6 +231,35 @@ def run_validation(num_iterations: int = 20000, save_plot: bool = False):
         for ckpt in checkpoints:
             # Retrain to exact checkpoint
             t2 = ScheduledKuhnTrainer(mode, param, discount)
+            t2.train(ckpt)
+            exploit_at[ckpt] = compute_exploitability(t2)
+
+        final_exploit = exploit_at[num_iterations]
+        final_value_error = abs(game_values[-1] - NASH_GAME_VALUE)
+
+        results[name] = {
+            'exploit_at': exploit_at,
+            'final_exploit': final_exploit,
+            'value_error': final_value_error,
+            'elapsed': elapsed,
+            'game_values': game_values,
+        }
+
+        status = 'OK' if final_exploit < 0.01 else 'WARN' if final_exploit < 0.05 else 'FAIL'
+        print(f"  [{status:>4}] {name:25s}  exploit={final_exploit:.6f}  "
+              f"val_err={final_value_error:.6f}  time={elapsed:.2f}s")
+
+    # WS2c: Zhang 2026 schedule sweep
+    print(f"\n  --- Zhang 2026 Schedule Sweep ---")
+    for name, alpha, beta, c in zhang_configs:
+        t0 = time.time()
+        trainer = Zhang2026KuhnTrainer(alpha=alpha, beta=beta, c=c)
+        game_values = trainer.train(num_iterations)
+        elapsed = time.time() - t0
+
+        exploit_at = {}
+        for ckpt in checkpoints:
+            t2 = Zhang2026KuhnTrainer(alpha=alpha, beta=beta, c=c)
             t2.train(ckpt)
             exploit_at[ckpt] = compute_exploitability(t2)
 

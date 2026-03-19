@@ -38,21 +38,28 @@ _p0_mapping = None
 _p1_mapping = None
 _p0_name = None
 _p1_name = None
+_p0_kwargs = {}
+_p1_kwargs = {}
 
 
-def _init_workers(p0_path, p0_map, p0_nm, p1_path, p1_map, p1_nm):
-    global _p0_trainer, _p1_trainer, _p0_mapping, _p1_mapping, _p0_name, _p1_name
+def _init_workers(p0_path, p0_map, p0_nm, p1_path, p1_map, p1_nm,
+                  p0_kw=None, p1_kw=None):
+    global _p0_trainer, _p1_trainer, _p0_mapping, _p1_mapping
+    global _p0_name, _p1_name, _p0_kwargs, _p1_kwargs
     _p0_trainer = CFRTrainer(); _p0_trainer.load(p0_path)
     grid = detect_action_grid_from_strategy(_p0_trainer); set_action_grid(grid)
     _p1_trainer = CFRTrainer(); _p1_trainer.load(p1_path)
     _p0_mapping = p0_map; _p1_mapping = p1_map
     _p0_name = p0_nm; _p1_name = p1_nm
+    _p0_kwargs = p0_kw or {}; _p1_kwargs = p1_kw or {}
 
 
 def _run_seed(args):
     seed, hands_per_seed = args
-    p0 = GTOAgent(_p0_trainer, name=_p0_name, mapping=_p0_mapping, simulations=80)
-    p1 = GTOAgent(_p1_trainer, name=_p1_name, mapping=_p1_mapping, simulations=80)
+    p0 = GTOAgent(_p0_trainer, name=_p0_name, mapping=_p0_mapping, simulations=80,
+                  **_p0_kwargs)
+    p1 = GTOAgent(_p1_trainer, name=_p1_name, mapping=_p1_mapping, simulations=80,
+                  **_p1_kwargs)
     match = HeadsUpMatch(p0, p1, big_blind=BIG_BLIND,
                          starting_chips=STARTING_CHIPS,
                          seed=seed, detailed_tracking=True)
@@ -344,14 +351,16 @@ def main():
     parser.add_argument("--p0-strategy", default="experiments/v11_poly2_100M.json",
                         help="Strategy file for P0")
     parser.add_argument("--p0-mapping", default="refine",
-                        choices=["nearest", "conservative", "confidence_nearest", "refine"],
+                        choices=["nearest", "conservative", "confidence_nearest", "refine",
+                                 "pseudo_harmonic"],
                         help="Mapping for P0")
     parser.add_argument("--p0-name", default="poly2+refine")
     parser.add_argument("--p1-strategy",
                         default="experiments/best/v9_B0_100M_allbots_positive.json",
                         help="Strategy file for P1")
     parser.add_argument("--p1-mapping", default="refine",
-                        choices=["nearest", "conservative", "confidence_nearest", "refine"],
+                        choices=["nearest", "conservative", "confidence_nearest", "refine",
+                                 "pseudo_harmonic"],
                         help="Mapping for P1")
     parser.add_argument("--p1-name", default="B0+refine")
     parser.add_argument("--hands", type=int, default=50_000,

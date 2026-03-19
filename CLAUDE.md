@@ -60,7 +60,7 @@ poker/
 │   ├── aivat.py               # v12: Half-AIVAT variance reduction
 │   ├── offtree_stress.py      # 11 off-tree sizing variants
 │   ├── translation_ab.py      # 4 mapping schemes A/B test
-│   ├── fast_equity.py         # Preflop cache + fast postflop equity
+│   ├── fast_equity.py         # Preflop cache + fast postflop equity + fast_equity_float()
 │   ├── opponent_tables/       # v13 WS7: per-opponent AIVAT calibration tables
 │   └── external/              # v12: external benchmarks
 │       ├── slumbot_client.py  # Slumbot API client (v13 WS8: fixed API format)
@@ -346,21 +346,30 @@ print(format_pain_map(analysis))
 
 ---
 
-## Current State (v13 in progress, 2026-03-16)
+## Current State (v13 COMPLETE, 2026-03-19)
 
-**Strategic goal (revised):** Build a bot capable of beating **any** opponent — not just minimizing exploitability. Pure GTO provides an unexploitable floor; the gap vs Slumbot (-530 bb/100) reveals that a real-time opponent modeling + exploit layer is required alongside the blueprint. See ACTION_PLAN_v13.md WS9 for the architecture.
+**Strategic goal:** Build the strongest possible baseline GTO model without opponent-specific exploitation.
 
-**BLUEPRINT DECISION: EMD+texture + pseudo_harmonic (NEW)** — `experiments/best/v13_EMD_texture_400M.json` with `mapping="pseudo_harmonic"` and `--emd-texture` flag
-**Previous best: B0 + pseudo_harmonic** — `experiments/best/v9_B0_100M_allbots_positive.json` with `mapping="pseudo_harmonic"`
-**Best mapping (EMD+texture): `pseudo_harmonic`** | **Best mapping (B0): `embedding_ph`** (v13 WS5b: embedding bucket interpolation + pseudo_harmonic action interpolation + confidence blending)
-**EMD+texture exploitability:** 1.3279 bb/100 (400M iters, 6.3M nodes) | **B0 exploitability:** 1.2211 bb/100 (100M iters, 1.05M nodes)
-**Gauntlet average (EMD+texture + pseudo_harmonic):** +358.6 bb/100 classic (5k hands × 3 seeds)
-**H2H vs B0:** +1846.9 ± 132.0 bb/100 (5k × 3 seeds, all seeds positive)
-**Gauntlet average (B0 + embedding_ph K=3):** +254.1 bb/100 classic (5k hands × 3 seeds) — **NEW BEST for B0 (+20% over pseudo_harmonic)**
-**Gauntlet average (B0 + pseudo_harmonic):** +212.0 bb/100 classic (5k hands × 3 seeds)
-**Phase B+ ablation status:** COMPLETE. VR-MCCFR shelved. Phase B closed.
-**Phase C (WS4+WS5) status:** COMPLETE — EMD+texture is new production baseline. See `docs/results/v13_WS4_WS5_EMD_texture_400M_20260319.md`.
-**⚠️ strategy.json contains EMD+texture model.** Requires `--emd-buckets` or `--emd-texture` flag for correct evaluation. For B0 fallback, load `experiments/best/v9_B0_100M_allbots_positive.json` without EMD flags.
+**PRODUCTION BASELINE (B1): EMD+texture 400M + `pseudo_harmonic`** — `experiments/best/v13_EMD_texture_400M.json` with `mapping="pseudo_harmonic"` and `--emd-buckets` flag
+**Previous baseline (B0): standard 120-bucket + `embedding_ph`** — `experiments/best/v9_B0_100M_allbots_positive.json` with `mapping="embedding_ph"` and `--embedding-model server/gto/embedding_weights.json --embedding-k 3`
+**B1 exploitability:** 1.3279 bb/100 (400M iters, 6.3M nodes) | **B0 exploitability:** 1.2211 bb/100 (100M iters, 1.05M nodes)
+**B1 gauntlet:** +358.6 bb/100 classic (5k hands × 3 seeds)
+**B0 gauntlet (embedding_ph):** +254.1 bb/100 classic (5k hands × 3 seeds)
+**B1 H2H vs B0:** +1846.9 ± 132.0 bb/100 (5k × 3 seeds, all seeds positive)
+**⚠️ strategy.json contains B1 (EMD+texture model).** Requires `--emd-buckets` flag for correct evaluation. For B0 fallback, load `experiments/best/v9_B0_100M_allbots_positive.json` without EMD flags.
+
+### V13 Cycle Summary
+
+| Phase | Workstreams | Result |
+|-------|------------|--------|
+| **A** (quick wins) | WS0 pseudo_harmonic, WS7 AIVAT, WS8 Slumbot | All complete ✅ |
+| **B** (training algorithms) | WS2a PCFR+, WS2b VR-MCCFR, WS2c Zhang, WS3 suit iso | PCFR+ and VR-MCCFR negative ❌; Zhang neutral; suit iso no-op. Phase closed. |
+| **B+** (ablation) | Isolated VR-MCCFR as sole cause of B0-v2 regression | Complete ✅ |
+| **C** (abstraction redesign) | WS4 EMD bucketing, WS5 board texture | EMD+texture = new production baseline at +358.6 ✅ |
+| **WS5b** (embedding CFR) | Soft-bucket interpolation via learned MLP | +254.1 on B0 (+20%); doesn't help EMD+texture. Research complete ✅ |
+| **WS1** (Refine 3.0) | Safe subgame solving | Implemented, eval skipped ⏭️ |
+| **WS6** (RL-CFR) | Dynamic action abstraction | Not started (optional research) ⏭️ |
+| **WS9** (exploit layer) | Opponent model + exploitation | Skipped — focus is baseline GTO ⏭️ |
 
 ### Gauntlet Results (v13 WS0, 10k hands × 3 seeds)
 

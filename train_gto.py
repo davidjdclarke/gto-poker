@@ -64,7 +64,9 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling,
                         phase_schedule_mode=1, allin_dampen_mode=1,
                         adaptive_averaging=0, regret_discount=1.0,
                         weight_schedule_mode=0, weight_schedule_param=1.0,
-                        action_grid_size=0):
+                        action_grid_size=0, solver_mode=0,
+                        vr_mccfr=0, zhang_alpha=1.5, zhang_c=1.0,
+                        vr_mccfr_warmup=0, emd_mode=0):
     """Train with a tqdm progress bar showing live stats."""
     if not HAS_TQDM:
         print(f"Training {format_num(iterations)} iterations "
@@ -77,7 +79,13 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling,
                       regret_discount=regret_discount,
                       weight_schedule_mode=weight_schedule_mode,
                       weight_schedule_param=weight_schedule_param,
-                      action_grid_size=action_grid_size)
+                      action_grid_size=action_grid_size,
+                      solver_mode=solver_mode,
+                      vr_mccfr=vr_mccfr,
+                      zhang_alpha=zhang_alpha,
+                      zhang_c=zhang_c,
+                      vr_mccfr_warmup=vr_mccfr_warmup,
+                      emd_mode=emd_mode)
         return
 
     engine = "Cython" if HAS_CYTHON and sampling == 'external' else "Python"
@@ -124,6 +132,12 @@ def train_with_progress(trainer, iterations, averaging_delay, sampling,
         weight_schedule_mode=weight_schedule_mode,
         weight_schedule_param=weight_schedule_param,
         action_grid_size=action_grid_size,
+        solver_mode=solver_mode,
+        vr_mccfr=vr_mccfr,
+        zhang_alpha=zhang_alpha,
+        zhang_c=zhang_c,
+        vr_mccfr_warmup=vr_mccfr_warmup,
+        emd_mode=emd_mode,
     )
 
     bar.close()
@@ -137,7 +151,9 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
                                   phase_schedule_mode=1, allin_dampen_mode=1,
                                   adaptive_averaging=0, regret_discount=1.0,
                                   weight_schedule_mode=0, weight_schedule_param=1.0,
-                                  action_grid_size=0):
+                                  action_grid_size=0, solver_mode=0,
+                                  vr_mccfr=0, zhang_alpha=1.5, zhang_c=1.0,
+                                  vr_mccfr_warmup=0, emd_mode=0):
     """Parallel training with tqdm progress bar."""
     import multiprocessing
     from server.gto.cfr import _parallel_worker, HAS_CYTHON
@@ -154,7 +170,13 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
                       regret_discount=regret_discount,
                       weight_schedule_mode=weight_schedule_mode,
                       weight_schedule_param=weight_schedule_param,
-                      action_grid_size=action_grid_size)
+                      action_grid_size=action_grid_size,
+                      solver_mode=solver_mode,
+                      vr_mccfr=vr_mccfr,
+                      zhang_alpha=zhang_alpha,
+                      zhang_c=zhang_c,
+                      vr_mccfr_warmup=vr_mccfr_warmup,
+                      emd_mode=emd_mode)
         return
 
     warmup_frac = 0.005
@@ -167,7 +189,7 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
         _cfr_fast.set_action_grid_size(action_grid_size)
 
     # Pre-allocate shared memory
-    _cfr_fast.init_pool_shared(2_000_000)
+    _cfr_fast.init_pool_shared(10_000_000)
     _cfr_fast.init_progress_counters(num_workers)
     if trainer.nodes:
         trainer._export_nodes_to_cython()
@@ -206,6 +228,12 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
             weight_schedule_mode=weight_schedule_mode,
             weight_schedule_param=weight_schedule_param,
             action_grid_size=action_grid_size,
+            solver_mode=solver_mode,
+            vr_mccfr=vr_mccfr,
+            zhang_alpha=zhang_alpha,
+            zhang_c=zhang_c,
+            vr_mccfr_warmup=vr_mccfr_warmup,
+            emd_mode=emd_mode,
         )
         done += batch
         elapsed = time.time() - t_start
@@ -237,7 +265,9 @@ def train_parallel_with_progress(trainer, iterations, averaging_delay,
                   phase_schedule_mode, allin_dampen_mode,
                   adaptive_averaging, regret_discount,
                   weight_schedule_mode, weight_schedule_param,
-                  action_grid_size))
+                  action_grid_size, solver_mode,
+                  vr_mccfr, zhang_alpha, zhang_c,
+                  vr_mccfr_warmup, emd_mode))
         processes.append((p, w_iters))
         p.start()
 
@@ -584,6 +614,12 @@ def main():
     action_grid_size = 0     # 0=default (Cython uses 16), 13=B0, 16=v9 expanded
     selective_river_overbet = False  # v12: add BET_TRIPLE_POT on river via selective action
     averaging_delay_override = -1    # -1 = use default (iterations // 4)
+    solver_mode = 0                  # WS2a: 0=CFR+ (default), 1=PCFR+ (optimistic)
+    vr_mccfr = 0                     # WS2b: 0=off, 1=on (VR-MCCFR baselines)
+    vr_mccfr_warmup = 0             # WS2b: iters of CFR+ before VR-MCCFR activation
+    emd_mode = 0                     # WS4: 0=off, 1=on (EMD bucketing)
+    zhang_alpha = 1.5                # WS2c: regret discount exponent
+    zhang_c = 1.0                    # WS2c: discount constant
     skip_indices = set()
     for i, flag in enumerate(sys.argv[1:], 1):
         if flag == '--workers' and i < len(sys.argv) - 1:
@@ -610,10 +646,19 @@ def main():
             skip_indices.add(i + 1)
         elif flag == '--weight-schedule' and i < len(sys.argv) - 1:
             val = sys.argv[i + 1]
-            weight_schedule_mode = {'linear': 0, 'exponential': 1, 'polynomial': 2, 'scheduled': 3}.get(val, 0)
+            weight_schedule_mode = {'linear': 0, 'exponential': 1, 'polynomial': 2,
+                                    'scheduled': 3, 'zhang2026': 4}.get(val, 0)
             skip_indices.add(i + 1)
         elif flag == '--weight-param' and i < len(sys.argv) - 1:
-            weight_schedule_param = float(sys.argv[i + 1])
+            param_str = sys.argv[i + 1]
+            if ',' in param_str:
+                # WS2c: zhang2026 uses alpha,beta,c
+                parts = param_str.split(',')
+                zhang_alpha = float(parts[0])
+                weight_schedule_param = float(parts[1]) if len(parts) > 1 else 2.0
+                zhang_c = float(parts[2]) if len(parts) > 2 else 1.0
+            else:
+                weight_schedule_param = float(param_str)
             skip_indices.add(i + 1)
         elif flag == '--gauntlet-interval' and i < len(sys.argv) - 1:
             gauntlet_interval = int(sys.argv[i + 1])
@@ -626,6 +671,36 @@ def main():
             skip_indices.add(i + 1)
         elif flag == '--selective-river-overbet':
             selective_river_overbet = True
+        elif flag == '--solver' and i < len(sys.argv) - 1:
+            val = sys.argv[i + 1]
+            if val == 'pcfr+':
+                solver_mode = 1
+            elif val == 'cfr+':
+                solver_mode = 0
+            else:
+                print(f"Unknown solver: {val}. Options: cfr+, pcfr+")
+                sys.exit(1)
+            skip_indices.add(i + 1)
+        elif flag == '--vr-mccfr':
+            vr_mccfr = 1
+        elif flag == '--vr-mccfr-warmup' and i < len(sys.argv) - 1:
+            vr_mccfr_warmup = int(sys.argv[i + 1])
+            skip_indices.add(i + 1)
+        elif flag == '--no-suit-iso':
+            from server.gto import equity as _equity_mod
+            _equity_mod.SUIT_ISO_ENABLED = False
+        elif flag == '--emd-buckets':
+            emd_mode = 1  # EMD-only (K=12, no texture)
+            from server.gto.abstraction import enable_emd_mode
+            enable_emd_mode()
+            from server.gto import equity as _equity_mod2
+            _equity_mod2.EMD_MODE_ENABLED = True
+        elif flag == '--emd-texture':
+            emd_mode = 2  # EMD + board texture (K=12, 4 textures)
+            from server.gto.abstraction import enable_emd_mode
+            enable_emd_mode()
+            from server.gto import equity as _equity_mod2
+            _equity_mod2.EMD_MODE_ENABLED = True
     if num_workers < 1:
         num_workers = 1
 
@@ -647,9 +722,12 @@ def main():
     dampen_str = 'new (rc==0,0.5x)' if allin_dampen_mode == 1 else 'old (rc<2,0.7x)'
 
     dcfr_str = f"gamma={regret_discount}" if regret_discount < 1.0 else "off (CFR+)"
-    wsched_names = {0: 'linear', 1: 'exponential', 2: 'polynomial', 3: 'scheduled'}
+    wsched_names = {0: 'linear', 1: 'exponential', 2: 'polynomial', 3: 'scheduled',
+                    4: 'zhang2026'}
     wsched_str = wsched_names.get(weight_schedule_mode, 'linear')
-    if weight_schedule_mode > 0:
+    if weight_schedule_mode == 4:
+        wsched_str += f'(α={zhang_alpha},β={weight_schedule_param},c={zhang_c})'
+    elif weight_schedule_mode > 0:
         wsched_str += f'({weight_schedule_param})'
 
     print(f"┌─────────────────────────────────────────────────┐")
@@ -666,6 +744,12 @@ def main():
     print(f"│  Grid:       {grid_str:>18}       │")
     overbet_str = 'yes' if selective_river_overbet else 'no'
     print(f"│  River 3xpot:{overbet_str:>18}       │")
+    solver_str = 'pcfr+' if solver_mode == 1 else 'cfr+'
+    print(f"│  Solver:     {solver_str:>18}       │")
+    vr_str = 'on' if vr_mccfr else 'off'
+    print(f"│  VR-MCCFR:   {vr_str:>18}       │")
+    emd_str = 'on' if emd_mode else 'off'
+    print(f"│  EMD bucket: {emd_str:>18}       │")
     print(f"└─────────────────────────────────────────────────┘")
 
     trainer = CFRTrainer()
@@ -709,7 +793,13 @@ def main():
                                          regret_discount=regret_discount,
                                          weight_schedule_mode=weight_schedule_mode,
                                          weight_schedule_param=weight_schedule_param,
-                                         action_grid_size=action_grid_size)
+                                         action_grid_size=action_grid_size,
+                                         solver_mode=solver_mode,
+                                         vr_mccfr=vr_mccfr,
+                                         zhang_alpha=zhang_alpha,
+                                         zhang_c=zhang_c,
+                                         vr_mccfr_warmup=vr_mccfr_warmup,
+                                         emd_mode=emd_mode)
         else:
             train_with_progress(trainer, n_iters, averaging_delay, sampling,
                                 phase_schedule_mode=phase_schedule_mode,
@@ -718,7 +808,13 @@ def main():
                                 regret_discount=regret_discount,
                                 weight_schedule_mode=weight_schedule_mode,
                                 weight_schedule_param=weight_schedule_param,
-                                action_grid_size=action_grid_size)
+                                action_grid_size=action_grid_size,
+                                solver_mode=solver_mode,
+                                vr_mccfr=vr_mccfr,
+                                zhang_alpha=zhang_alpha,
+                                zhang_c=zhang_c,
+                                vr_mccfr_warmup=vr_mccfr_warmup,
+                                emd_mode=emd_mode)
 
     t_start = time.time()
 

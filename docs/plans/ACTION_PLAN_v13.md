@@ -1,8 +1,10 @@
 # V13 Action Plan — GTO Solver
 
 **Date:** 2026-03-16
-**Status:** Final
+**Closed:** 2026-03-19
+**Status:** COMPLETE
 **Scope:** Breaking through the 1.22 bb/100 abstraction ceiling
+**Outcome:** EMD+texture abstraction (WS4+WS5) is the new production baseline at +358.6 bb/100 gauntlet avg. Embedding CFR (WS5b) improves B0 by +20% but doesn't help EMD. Training algorithm improvements (PCFR+, VR-MCCFR) were negative results. WS9 (exploit layer) skipped — focus is baseline GTO.
 
 ---
 

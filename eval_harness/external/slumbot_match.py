@@ -124,16 +124,19 @@ class SlumbotMatch:
                     raise
 
     def _play_hand_attempt(self, hand_num: int) -> HandRecord:
-        """Single attempt to play one hand."""
-        state = self.client.new_hand()
-        hand_id = state.get("hand_id", str(hand_num))
+        """Single attempt to play one hand.
 
+        The Slumbot API is synchronous: each response already includes
+        Slumbot's counter-action. After new_hand() or act(), if not terminal,
+        it is always our turn to act next.
+        """
+        from eval_harness.external.slumbot_client import is_terminal
+        state = self.client.new_hand()
+        token = state.get("token", "")
+
+        from eval_harness.external.slumbot_client import parse_slumbot_cards
         our_cards_raw = state.get("hole_cards", [])
-        from server.deck import Card
-        try:
-            our_cards = [Card.from_str(c) for c in our_cards_raw]
-        except Exception:
-            our_cards = []
+        our_cards = parse_slumbot_cards(our_cards_raw)
 
         actions_log = []
         phases_reached = ["preflop"]
@@ -142,18 +145,8 @@ class SlumbotMatch:
         _max_iterations = 50  # guard against infinite loop on unexpected API state
         _iteration = 0
 
-        while not state.get("terminal", False) and _iteration < _max_iterations:
+        while not is_terminal(state) and _iteration < _max_iterations:
             _iteration += 1
-            # Determine if it's our turn
-            if not state.get("our_turn", True):
-                # Slumbot acts automatically; the returned state already reflects
-                # its move. If the API sets our_turn=False on a non-terminal state,
-                # we need to fetch the updated state by sending a no-op act call.
-                try:
-                    state = self.client.act(hand_id, "")
-                except Exception:
-                    break
-                continue
 
             ctx = SlumbotClient.state_to_hand_context(
                 state, our_cards, self.config.big_blind
@@ -167,19 +160,22 @@ class SlumbotMatch:
                 decision, state, self.config.big_blind
             )
             actions_log.append(f"gto:{action_str}")
-            state = self.client.act(hand_id, action_str)
+            state = self.client.act(token, action_str)
+            # Update token in case it rotates (API may issue a new one)
+            if "token" in state:
+                token = state["token"]
 
         # Extract result
-        if state.get("terminal", False):
+        if is_terminal(state):
             p0_net = self.client.get_result(state)
-            went_to_showdown = state.get("showdown", False)
+            went_to_showdown = bool(state.get("bot_hole_cards"))
 
         return HandRecord(
             hand_num=hand_num,
             p0_cards=[str(c) for c in our_cards],
-            p1_cards=[],  # Slumbot hole cards not revealed until showdown
-            community=[str(c) for c in state.get("board_cards", [])],
-            pot=int(state.get("pot", 0)),
+            p1_cards=[str(c) for c in state.get("bot_hole_cards", [])],
+            community=[str(c) for c in state.get("board", [])],
+            pot=int(state.get("won_pot", 0)),
             winner=0 if p0_net > 0 else (1 if p0_net < 0 else -1),
             p0_net=p0_net,
             phases_reached=phases_reached,

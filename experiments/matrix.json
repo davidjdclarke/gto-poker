@@ -755,5 +755,285 @@
       "frequency_anomalies": 16228
     },
     "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260316_155747_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260316_203510",
+    "timestamp": "2026-03-16T20:35:19",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1062697,
+      "train_time_s": 2440.7,
+      "ms_per_iteration": 0.02,
+      "exploitability_mean": 1.3621,
+      "exploitability_std": 0.0309,
+      "exploitability_preflop": 1.353
+    },
+    "audit_counts": {
+      "premium_limp": 4,
+      "allin_overuse": 557,
+      "flat_strategies": 350,
+      "frequency_anomalies": 17156
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260316_203510_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260317_152610",
+    "timestamp": "2026-03-17T15:26:20",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1062642,
+      "train_time_s": 2721.5,
+      "ms_per_iteration": 0.03,
+      "exploitability_mean": 1.3894,
+      "exploitability_std": 0.004,
+      "exploitability_preflop": 1.35
+    },
+    "audit_counts": {
+      "premium_limp": 4,
+      "allin_overuse": 583,
+      "flat_strategies": 410,
+      "frequency_anomalies": 17041
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260317_152610_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260317_161018",
+    "timestamp": "2026-03-17T16:10:27",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1059597,
+      "train_time_s": 2427.8,
+      "ms_per_iteration": 0.02,
+      "exploitability_mean": 1.2257,
+      "exploitability_std": 0.0406,
+      "exploitability_preflop": 1.0287
+    },
+    "audit_counts": {
+      "premium_limp": 2,
+      "allin_overuse": 428,
+      "flat_strategies": 959,
+      "frequency_anomalies": 17833
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260317_161018_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260317_170516",
+    "timestamp": "2026-03-17T17:05:25",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1059786,
+      "train_time_s": 2397.5,
+      "ms_per_iteration": 0.02,
+      "exploitability_mean": 1.3754,
+      "exploitability_std": 0.0425,
+      "exploitability_preflop": 1.3263
+    },
+    "audit_counts": {
+      "premium_limp": 3,
+      "allin_overuse": 507,
+      "flat_strategies": 742,
+      "frequency_anomalies": 17516
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260317_170516_strategy.json"
+  },
+  {
+    "name": "v6_20.0M_20260317_180941",
+    "timestamp": "2026-03-17T18:09:50",
+    "config": {
+      "iterations": 20000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1062960,
+      "train_time_s": 1810.3,
+      "ms_per_iteration": 0.09,
+      "exploitability_mean": 1.2334,
+      "exploitability_std": 0.0242,
+      "exploitability_preflop": 1.0972
+    },
+    "audit_counts": {
+      "premium_limp": 5,
+      "allin_overuse": 492,
+      "flat_strategies": 1289,
+      "frequency_anomalies": 16422
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_20.0M_20260317_180941_strategy.json"
+  },
+  {
+    "name": "v6_20.0M_20260317_184838",
+    "timestamp": "2026-03-17T18:48:46",
+    "config": {
+      "iterations": 20000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1062960,
+      "train_time_s": 1988.4,
+      "ms_per_iteration": 0.1,
+      "exploitability_mean": 1.4969,
+      "exploitability_std": 0.0247,
+      "exploitability_preflop": 1.4993
+    },
+    "audit_counts": {
+      "premium_limp": 4,
+      "allin_overuse": 681,
+      "flat_strategies": 532,
+      "frequency_anomalies": 14950
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_20.0M_20260317_184838_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260318_142158",
+    "timestamp": "2026-03-18T14:22:11",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1578920,
+      "train_time_s": 2250.4,
+      "ms_per_iteration": 0.02,
+      "exploitability_mean": 125.752,
+      "exploitability_std": 2.0238,
+      "exploitability_preflop": 142.5225
+    },
+    "audit_counts": {
+      "premium_limp": 10,
+      "allin_overuse": 572,
+      "flat_strategies": 1153,
+      "frequency_anomalies": 95042
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260318_142158_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260318_151502",
+    "timestamp": "2026-03-18T15:15:17",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1577816,
+      "train_time_s": 2303.9,
+      "ms_per_iteration": 0.02,
+      "exploitability_mean": 127.4078,
+      "exploitability_std": 4.9703,
+      "exploitability_preflop": 145.5666
+    },
+    "audit_counts": {
+      "premium_limp": 9,
+      "allin_overuse": 573,
+      "flat_strategies": 1206,
+      "frequency_anomalies": 94265
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260318_151502_strategy.json"
+  },
+  {
+    "name": "v6_100.0M_20260318_170957",
+    "timestamp": "2026-03-18T17:10:13",
+    "config": {
+      "iterations": 100000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 1579877,
+      "train_time_s": 2784.3,
+      "ms_per_iteration": 0.03,
+      "exploitability_mean": 1.2967,
+      "exploitability_std": 0.0195,
+      "exploitability_preflop": 1.222
+    },
+    "audit_counts": {
+      "premium_limp": 9,
+      "allin_overuse": 622,
+      "flat_strategies": 627,
+      "frequency_anomalies": 95703
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_100.0M_20260318_170957_strategy.json"
+  },
+  {
+    "name": "v6_400.0M_20260318_213658",
+    "timestamp": "2026-03-18T21:38:25",
+    "config": {
+      "iterations": 400000000,
+      "sampling": "external",
+      "strategy_version": 6,
+      "equity_buckets": 8,
+      "hand_types": 15,
+      "total_buckets": 120,
+      "engine": "Cython"
+    },
+    "results": {
+      "num_nodes": 6298443,
+      "train_time_s": 15113.0,
+      "ms_per_iteration": 0.04,
+      "exploitability_mean": 1.3279,
+      "exploitability_std": 0.0282,
+      "exploitability_preflop": 1.1883
+    },
+    "audit_counts": {
+      "premium_limp": 9,
+      "allin_overuse": 2273,
+      "flat_strategies": 4125,
+      "frequency_anomalies": 347642
+    },
+    "strategy_file": "/home/djclarke/drinking/poker/experiments/v6_400.0M_20260318_213658_strategy.json"
   }
 ]

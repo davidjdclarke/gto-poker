@@ -91,6 +91,10 @@ NUM_HAND_TYPES = len(HandType)
 NUM_EQUITY_BUCKETS = 8   # Equity dimension of 2D bucket (default; v11 D2 tests 9)
 NUM_BUCKETS = NUM_EQUITY_BUCKETS * NUM_HAND_TYPES  # Total bucket count
 
+# WS4+WS5: EMD mode with board texture
+EMD_MODE = False       # When True, use EMD clustering + board texture
+NUM_TEXTURES = 4       # 0=DRY, 1=MONO, 2=DRAW_HEAVY/CONNECTED, 3=PAIRED
+
 
 def set_equity_buckets(n: int) -> None:
     """Set the number of equity buckets (v11 D2 experiment).
@@ -102,6 +106,29 @@ def set_equity_buckets(n: int) -> None:
     assert 4 <= n <= 16, f"Equity buckets must be 4-16, got {n}"
     NUM_EQUITY_BUCKETS = n
     NUM_BUCKETS = NUM_EQUITY_BUCKETS * NUM_HAND_TYPES
+
+
+def enable_emd_mode() -> None:
+    """Enable EMD clustering mode (WS4+WS5).
+
+    Sets K=12 equity clusters and enables board texture dimension.
+    WARNING: Invalidates all existing strategies. Must retrain.
+    """
+    global EMD_MODE, NUM_EQUITY_BUCKETS, NUM_BUCKETS
+    EMD_MODE = True
+    NUM_EQUITY_BUCKETS = 12
+    NUM_BUCKETS = NUM_EQUITY_BUCKETS * NUM_HAND_TYPES
+
+
+def texture_for_key(board_texture_value: int) -> int:
+    """Map 5-class BoardTexture to 4-class key texture (2 bits).
+
+    Merges CONNECTED(4) into DRAW_HEAVY(2) since both involve
+    straight potential. Fits in 2 bits for Cython key encoding.
+    """
+    if board_texture_value == 4:  # CONNECTED → DRAW_HEAVY
+        return 2
+    return min(board_texture_value, 3)
 
 
 def classify_hand_type(rank1: int, rank2: int, suited: bool) -> HandType:
@@ -177,23 +204,27 @@ class InfoSet:
     - The game phase (preflop, flop, turn, river)
     - Their position (ip = in position, oop = out of position)
     - The betting history in the current round
+    - (EMD mode) Board texture class (0-3)
     """
 
     def __init__(self, bucket: int, phase: str, history: tuple[int, ...],
-                 position: str = ''):
+                 position: str = '', texture: int = 0):
         self.bucket = bucket
         self.phase = phase
         self.history = history
         self.position = position  # 'ip' or 'oop'
+        self.texture = texture    # WS5: 0-3 board texture (0 for preflop)
 
     @property
     def key(self) -> str:
         """Unique string key for this information set.
 
-        Format: {phase}:{position}:{bucket}:{history}
-        Position is always included for v5+ strategies.
+        Format (standard): {phase}:{position}:{bucket}:{history}
+        Format (EMD mode):  {phase}:{position}:{bucket}:{texture}:{history}
         """
         hist_str = ''.join(str(a) for a in self.history)
+        if EMD_MODE and self.position:
+            return f"{self.phase}:{self.position}:{self.bucket}:{self.texture}:{hist_str}"
         if self.position:
             return f"{self.phase}:{self.position}:{self.bucket}:{hist_str}"
         return f"{self.phase}:{self.bucket}:{hist_str}"
@@ -478,6 +509,128 @@ _POSTFLOP_CONCRETE_MAP: dict[str, int] = {
     "bet_double_pot":  int(Action.BET_DOUBLE_POT),
     "bet_triple_pot":  int(Action.BET_TRIPLE_POT),
 }
+
+
+# ---------------------------------------------------------------------------
+# Pseudo-harmonic action translation (WS0)
+# Ganzfried & Sandholm, "Action Translation in Extensive-Form Games", IJCAI 2013
+# ---------------------------------------------------------------------------
+
+# Canonical pot-fraction for each postflop abstract bet action.
+# ALL_IN uses sentinel 3.0 (consistent with eval_harness/confidence.py).
+ABSTRACT_BET_FRACTIONS: dict[int, float] = {
+    int(Action.BET_QUARTER_POT):        0.25,
+    int(Action.BET_THIRD_POT):          1.0 / 3.0,
+    int(Action.DONK_SMALL):             0.25,
+    int(Action.BET_HALF_POT):           0.50,
+    int(Action.DONK_MEDIUM):            0.50,
+    int(Action.BET_TWO_THIRDS_POT):     2.0 / 3.0,
+    int(Action.BET_THREE_QUARTER_POT):  0.75,
+    int(Action.BET_POT):                1.00,
+    int(Action.BET_OVERBET):            1.25,
+    int(Action.BET_DOUBLE_POT):         2.00,
+    int(Action.BET_TRIPLE_POT):         3.00,
+    int(Action.ALL_IN):                 3.00,
+}
+
+# Default bracket ladder for the 13-action postflop grid — the abstract bet
+# actions sorted ascending by their pot-fraction.  ALL_IN uses sentinel 3.0.
+_BRACKET_LADDER_13: list[tuple[float, int]] = [
+    (1.0 / 3.0, int(Action.BET_THIRD_POT)),
+    (0.50,       int(Action.BET_HALF_POT)),
+    (2.0 / 3.0,  int(Action.BET_TWO_THIRDS_POT)),
+    (1.00,       int(Action.BET_POT)),
+    (1.25,       int(Action.BET_OVERBET)),
+    (3.00,       int(Action.ALL_IN)),
+]
+
+
+def pseudo_harmonic_translate(concrete_ratio: float,
+                               bracket_actions: "list | None" = None,
+                               ) -> tuple:
+    """Compute pseudo-harmonic blending weights for an opponent's off-tree bet.
+
+    Given a concrete bet ratio (to_call / pot) and the set of abstract bet
+    actions in the current game tree, returns
+
+        (lower_action_id, upper_action_id, p_lower)
+
+    where the response strategy is blended as
+
+        strategy(x) = p_lower * strategy(lower) + (1-p_lower) * strategy(upper)
+
+    The weight p_lower is derived from Ganzfried & Sandholm (IJCAI 2013).
+    The paper's formula p(x,a,b) = b*(x-a)/(x*(b-a)) gives the weight for the
+    UPPER action.  The complementary weight for the lower action is:
+
+        p_lower(x, a, b) = a * (b - x) / (x * (b - a))
+
+    Boundary: p_lower(a)=1 (full lower), p_lower(b)=0 (full upper).
+    Harmonic midpoint 2ab/(a+b): p_lower=0.5.
+    This is the unique mapping satisfying boundary, monotonicity,
+    shift-invariance, and scale-invariance axioms.
+
+    If the concrete ratio is at or outside the abstract range, returns
+    (only_action, only_action, 1.0) — no blending needed.
+
+    Args:
+        concrete_ratio: opponent's bet as fraction of pot (e.g. 0.4 = 40% pot)
+        bracket_actions: optional list of Action int values to use as the
+                         bracket set.  Defaults to the 13-action postflop
+                         ladder (_BRACKET_LADDER_13).
+
+    Returns:
+        (lower_action_id, upper_action_id, p_lower)
+        lower_action_id == upper_action_id signals an exact/boundary match.
+    """
+    if bracket_actions is None:
+        ladder = _BRACKET_LADDER_13
+    else:
+        ladder = sorted(
+            [(ABSTRACT_BET_FRACTIONS[int(a)], int(a))
+             for a in bracket_actions
+             if int(a) in ABSTRACT_BET_FRACTIONS],
+            key=lambda t: t[0],
+        )
+
+    if not ladder:
+        return (int(Action.CHECK_CALL), int(Action.CHECK_CALL), 1.0)
+
+    fracs = [f for f, _ in ladder]
+    acts  = [a for _, a in ladder]
+
+    # Below the minimum abstract bet: use the lowest action entirely
+    if concrete_ratio <= fracs[0]:
+        return (acts[0], acts[0], 1.0)
+
+    # Above the maximum abstract bet: use the highest action entirely
+    if concrete_ratio >= fracs[-1]:
+        return (acts[-1], acts[-1], 1.0)
+
+    # Find the bracketing pair
+    for i in range(len(fracs) - 1):
+        a_frac = fracs[i]
+        b_frac = fracs[i + 1]
+        if concrete_ratio <= b_frac:
+            if abs(concrete_ratio - a_frac) < 1e-9:
+                return (acts[i], acts[i], 1.0)
+            if abs(concrete_ratio - b_frac) < 1e-9:
+                return (acts[i + 1], acts[i + 1], 1.0)
+            # Correct p_lower formula: weight for the LOWER abstract action.
+            # From Ganzfried & Sandholm (IJCAI 2013), the pseudo-harmonic
+            # formula b*(x-a)/(x*(b-a)) gives the weight for the UPPER action.
+            # The complementary weight for the lower action is:
+            #   p_lower = a*(b-x) / (x*(b-a))
+            # Boundary checks: p_lower(x=a)=1, p_lower(x=b)=0 — correct.
+            a, b, x = a_frac, b_frac, concrete_ratio
+            denom = x * (b - a)
+            if denom <= 1e-12:
+                return (acts[i], acts[i], 1.0)
+            p_lower = a * (b - x) / denom
+            p_lower = max(0.0, min(1.0, p_lower))
+            return (acts[i], acts[i + 1], p_lower)
+
+    return (acts[-1], acts[-1], 1.0)
 
 
 def concrete_to_abstract_history(history: list[str], phase: str) -> tuple:

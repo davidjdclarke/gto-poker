@@ -20,6 +20,17 @@ from server.gto.abstraction import (
 )
 
 
+# Module-level toggle for suit isomorphism (WS3).
+# Set to False to disable canonicalization (e.g. for ablation testing).
+SUIT_ISO_ENABLED = True
+
+# WS4: EMD clustering mode. When enabled, equity bucketing uses
+# precomputed EMD cluster centroids instead of uniform bands.
+EMD_MODE_ENABLED = False
+_EMD_CENTROIDS = None    # Lazy-loaded: {street: np.ndarray(K, N_BINS)}
+_EMD_PREFLOP_TABLE = None  # Lazy-loaded: {canonical_key: cluster_id}
+
+
 def make_deck() -> list[Card]:
     return [Card(rank, suit) for suit in SUITS for rank in range(2, 15)]
 
@@ -113,6 +124,162 @@ def hand_strength_squared(hole_cards: list[Card], community: list[Card],
     return sum_hs_sq / num_rollouts if num_rollouts > 0 else 0.25
 
 
+# ---------------------------------------------------------------------------
+# WS3: Suit isomorphism canonicalization (Waugh 2013)
+# ---------------------------------------------------------------------------
+
+# Canonical suit ordering: map suits to indices for lexicographic comparison
+_SUIT_ORD = {'c': 0, 'd': 1, 'h': 2, 's': 3}
+_SUITS_LIST = ['c', 'd', 'h', 's']
+
+
+def canonicalize_hand_board(hole_cards: list[Card],
+                            community: list[Card]) -> tuple[list[Card], list[Card]]:
+    """Canonicalize hole cards + board under suit isomorphism.
+
+    Two hand-board combinations are suit-isomorphic if one can be obtained
+    from the other by a permutation of suits. This function returns the
+    lexicographically smallest representation, ensuring isomorphic hands
+    map to the same canonical form.
+
+    Algorithm (Waugh 2013):
+    1. Build the suit signature: for each suit, record its occurrences on the
+       board as a sorted tuple of ranks.
+    2. Group suits with identical board signatures (these are freely
+       interchangeable).
+    3. Within each equivalence class, try all permutations and pick the one
+       that produces the lexicographically smallest (hole, board) tuple.
+
+    For preflop (empty community), this reduces to: suited pairs are
+    canonical as-is (c,c), offsuit pairs are canonical as (c,d).
+
+    Args:
+        hole_cards: 2-element list of Card
+        community:  0-5 element list of Card
+
+    Returns:
+        (canonical_hole, canonical_board) with remapped suits
+    """
+    from itertools import permutations
+
+    if not community:
+        # Preflop: simple canonicalization
+        c1, c2 = hole_cards[0], hole_cards[1]
+        if c1.suit == c2.suit:
+            return [Card(c1.rank, 'c'), Card(c2.rank, 'c')], []
+        else:
+            # Offsuit: map to (c, d)
+            r1, r2 = max(c1.rank, c2.rank), min(c1.rank, c2.rank)
+            return [Card(r1, 'c'), Card(r2, 'd')], []
+
+    # Build board suit signature: suit -> sorted tuple of ranks on board
+    board_sig = {}
+    for suit in _SUITS_LIST:
+        ranks = sorted(c.rank for c in community if c.suit == suit)
+        board_sig[suit] = tuple(ranks)
+
+    # Group suits by their board signature
+    sig_to_suits = {}
+    for suit, sig in board_sig.items():
+        sig_to_suits.setdefault(sig, []).append(suit)
+
+    # Get the distinct signature groups, sorted by signature for determinism
+    sig_groups = sorted(sig_to_suits.values(),
+                        key=lambda g: board_sig[g[0]], reverse=True)
+
+    # Generate all valid suit permutations:
+    # Within each signature group, any permutation is valid (these suits
+    # are interchangeable on the board). Across groups, no swapping.
+    def _generate_perms(groups):
+        if not groups:
+            yield {}
+            return
+        group = groups[0]
+        rest = groups[1:]
+        for perm in permutations(group):
+            mapping = dict(zip(group, perm))
+            for rest_mapping in _generate_perms(rest):
+                full = {**mapping, **rest_mapping}
+                yield full
+
+    def _apply(mapping, cards):
+        return tuple((c.rank, mapping.get(c.suit, c.suit)) for c in cards)
+
+    def _card_key(rank_suit):
+        return (rank_suit[0], _SUIT_ORD.get(rank_suit[1], 0))
+
+    best = None
+    best_mapping = None
+
+    for mapping in _generate_perms(sig_groups):
+        hole_mapped = _apply(mapping, hole_cards)
+        board_mapped = _apply(mapping, community)
+        # Create a sortable key: board first (sorted), then hole (sorted)
+        key = (tuple(sorted(board_mapped, key=_card_key)),
+               tuple(sorted(hole_mapped, key=_card_key)))
+        if best is None or key < best:
+            best = key
+            best_mapping = mapping
+
+    # Apply best mapping
+    canon_hole = [Card(c.rank, best_mapping.get(c.suit, c.suit))
+                  for c in hole_cards]
+    canon_board = [Card(c.rank, best_mapping.get(c.suit, c.suit))
+                   for c in community]
+    return canon_hole, canon_board
+
+
+def _load_emd_data():
+    """Lazy-load EMD centroids and preflop table on first use."""
+    global _EMD_CENTROIDS, _EMD_PREFLOP_TABLE
+    if _EMD_CENTROIDS is None:
+        from server.gto.emd_clustering import load_centroids, load_preflop_table
+        _EMD_CENTROIDS = load_centroids()
+        _EMD_PREFLOP_TABLE = load_preflop_table()
+
+
+def emd_equity_bucket(hole_cards: list[Card], community: list[Card],
+                      simulations: int = 300) -> int:
+    """Compute equity bucket using EMD cluster assignment (WS4).
+
+    Preflop: direct lookup in precomputed table (0ms).
+    Postflop: compute raw equity, map to nearest centroid via precomputed
+    boundaries. Same speed as standard bucketing — no histogram or EMD needed.
+    """
+    from server.gto.emd_clustering import (
+        load_equity_boundaries, fast_emd_bucket
+    )
+    _load_emd_data()
+
+    if len(community) == 0:
+        # Preflop: direct lookup
+        c1, c2 = hole_cards[0], hole_cards[1]
+        high = max(c1.rank, c2.rank)
+        low = min(c1.rank, c2.rank)
+        suited = c1.suit == c2.suit
+        if high == low:
+            key = f"{high}_{low}"
+        else:
+            s = 's' if suited else 'o'
+            key = f"{high}_{low}_{s}"
+        if key in _EMD_PREFLOP_TABLE:
+            return _EMD_PREFLOP_TABLE[key]
+
+    # Postflop (or preflop fallback): compute raw equity, use boundary lookup
+    street = {0: 'preflop', 3: 'flop', 4: 'turn', 5: 'river'}.get(
+        len(community), 'river')
+    boundaries = load_equity_boundaries()[street]
+
+    # Use fast equity (Cython if available)
+    if len(community) < 5:
+        score = hand_strength_squared(hole_cards, community, 1, simulations)
+        score = score ** 0.5
+    else:
+        score = hand_equity(hole_cards, community, 1, simulations)
+
+    return fast_emd_bucket(score, boundaries)
+
+
 def hand_strength_bucket(hole_cards: list[Card], community: list[Card],
                          num_opponents: int = 1, num_buckets: int = None,
                          simulations: int = 300,
@@ -130,19 +297,30 @@ def hand_strength_bucket(hole_cards: list[Card], community: list[Card],
     When use_ehs2=True, uses Expected Hand Strength Squared for the equity
     dimension [Zinkevich et al. 2007, Section 4.1].
     """
+    # WS3: canonicalize under suit isomorphism before computing equity
+    # This ensures isomorphic hands always map to the same bucket.
+    if SUIT_ISO_ENABLED:
+        canon_hole, canon_board = canonicalize_hand_board(hole_cards, community)
+    else:
+        canon_hole, canon_board = hole_cards, community
+
     # Equity dimension
-    if use_ehs2 and len(community) < 5:
+    if EMD_MODE_ENABLED:
+        # WS4: EMD cluster assignment replaces uniform bands
+        eq_bucket = emd_equity_bucket(canon_hole, canon_board, simulations)
+    elif use_ehs2 and len(canon_board) < 5:
         score = hand_strength_squared(
-            hole_cards, community, num_opponents, simulations)
+            canon_hole, canon_board, num_opponents, simulations)
         score = score ** 0.5
+        eq_bucket = int(score * NUM_EQUITY_BUCKETS)
+        eq_bucket = min(eq_bucket, NUM_EQUITY_BUCKETS - 1)
     else:
         score = hand_equity(
-            hole_cards, community, num_opponents, simulations)
+            canon_hole, canon_board, num_opponents, simulations)
+        eq_bucket = int(score * NUM_EQUITY_BUCKETS)
+        eq_bucket = min(eq_bucket, NUM_EQUITY_BUCKETS - 1)
 
-    eq_bucket = int(score * NUM_EQUITY_BUCKETS)
-    eq_bucket = min(eq_bucket, NUM_EQUITY_BUCKETS - 1)
-
-    # Hand type dimension
+    # Hand type dimension (uses original cards — rank+suited doesn't change)
     c1, c2 = hole_cards[0], hole_cards[1]
     suited = c1.suit == c2.suit
     hand_type = classify_hand_type(c1.rank, c2.rank, suited)

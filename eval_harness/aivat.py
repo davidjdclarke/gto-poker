@@ -50,6 +50,7 @@ import numpy as np
 from eval_harness.match_engine import HandRecord, DecisionRecord, MatchResult, GTOAgent
 
 _DEFAULT_TABLE_PATH = Path(__file__).parent / "bucket_ev_table.json"
+_OPPONENT_TABLE_DIR = Path(__file__).parent / "opponent_tables"
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -394,4 +395,86 @@ def build_and_save_bucket_ev_table(trainer, num_hands: int = 10000,
     total_entries = sum(len(v) for v in table.values())
     print(f"  Bucket-EV table: {total_entries} entries across "
           f"{len(table)} phases → saved to {path}")
+    return table
+
+
+# ---------------------------------------------------------------------------
+# Per-opponent calibration tables (WS7)
+# ---------------------------------------------------------------------------
+def _opponent_table_path(opponent_name: str) -> Path:
+    """Return the expected path for a per-opponent bucket-EV table."""
+    safe_name = opponent_name.replace(" ", "_").lower()
+    return _OPPONENT_TABLE_DIR / f"{safe_name}_bucket_ev.json"
+
+
+def opponent_ev_table_exists(opponent_name: str) -> bool:
+    """Return True if a per-opponent calibration table exists for this bot."""
+    return _opponent_table_path(opponent_name).exists()
+
+
+def load_opponent_bucket_ev_table(opponent_name: str) -> dict:
+    """Load the per-opponent bucket-EV table for a named adversary.
+
+    Args:
+        opponent_name: bot name (e.g. "NitBot", "CallStationBot")
+
+    Returns:
+        dict: {phase: {eq_bucket_int: mean_ev_bb}}
+
+    Raises:
+        FileNotFoundError: if no per-opponent table exists
+    """
+    path = _opponent_table_path(opponent_name)
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Per-opponent bucket-EV table not found for '{opponent_name}' at {path}. "
+            f"Run --build-opponent-aivat {opponent_name} first."
+        )
+    with open(path) as f:
+        raw = json.load(f)
+    return {phase: {int(k): float(v) for k, v in buckets.items()}
+            for phase, buckets in raw.items()}
+
+
+def build_and_save_opponent_bucket_ev_table(
+    trainer, opponent, num_hands: int = 5000,
+    seed: int = 0, big_blind: int = 20
+) -> dict:
+    """Run GTO vs a specific opponent and build+save a per-opponent calibration table.
+
+    Per-opponent calibration is required for AIVAT to be valid in gauntlet
+    evaluation. The GTO self-play table has near-zero baseline values, but
+    continuation values against weak bots are hundreds of bb/100 — causing
+    variance inflation rather than reduction. A table calibrated against the
+    specific opponent makes the control variate zero-mean for that matchup.
+
+    Args:
+        trainer:   CFRTrainer with loaded strategy
+        opponent:  adversary Agent instance (from get_all_adversaries)
+        num_hands: calibration hands (default 5,000; WS7 spec)
+        seed:      RNG seed (default 0 — separate from gauntlet seeds)
+        big_blind: big blind chip value
+
+    Returns:
+        dict: the generated bucket-EV table
+    """
+    from eval_harness.match_engine import GTOAgent, HeadsUpMatch
+
+    print(f"\n  Building per-opponent bucket-EV table: GTO vs {opponent.name} "
+          f"({num_hands:,} hands, seed={seed})...")
+    gto = GTOAgent(trainer, name="GTO", simulations=80)
+    match = HeadsUpMatch(gto, opponent, big_blind=big_blind, seed=seed,
+                         detailed_tracking=True)
+    result = match.play(num_hands)
+    table = build_bucket_ev_table(result.hands, big_blind=big_blind)
+
+    _OPPONENT_TABLE_DIR.mkdir(exist_ok=True)
+    path = _opponent_table_path(opponent.name)
+    serializable = {phase: {str(k): v for k, v in buckets.items()}
+                    for phase, buckets in table.items()}
+    with open(path, "w") as f:
+        json.dump(serializable, f, indent=2)
+
+    total_entries = sum(len(v) for v in table.values())
+    print(f"  Per-opponent table ({opponent.name}): {total_entries} entries → {path}")
     return table

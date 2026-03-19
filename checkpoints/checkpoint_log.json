@@ -1,72 +1,30 @@
 [
   {
-    "iterations": 110000000,
-    "nodes": 1055281,
-    "timestamp": "20260316_125010",
-    "file": "checkpoints/ckpt_110000000.json",
-    "exploitability": 24.6249
-  },
-  {
-    "iterations": 120000000,
-    "nodes": 1055554,
-    "timestamp": "20260316_131748",
-    "file": "checkpoints/ckpt_120000000.json",
-    "exploitability": 24.7658
-  },
-  {
-    "iterations": 130000000,
-    "nodes": 1055785,
-    "timestamp": "20260316_132729",
-    "file": "checkpoints/ckpt_130000000.json",
-    "exploitability": 25.0982
-  },
-  {
-    "iterations": 140000000,
-    "nodes": 1055974,
-    "timestamp": "20260316_145456",
-    "file": "checkpoints/ckpt_140000000.json",
-    "exploitability": 26.8477
-  },
-  {
-    "iterations": 150000000,
-    "nodes": 1056153,
-    "timestamp": "20260316_150521",
-    "file": "checkpoints/ckpt_150000000.json",
-    "exploitability": 23.0661
-  },
-  {
-    "iterations": 160000000,
-    "nodes": 1056273,
-    "timestamp": "20260316_151430",
-    "file": "checkpoints/ckpt_160000000.json",
-    "exploitability": 23.7361
-  },
-  {
-    "iterations": 170000000,
-    "nodes": 1056420,
-    "timestamp": "20260316_152235",
-    "file": "checkpoints/ckpt_170000000.json",
-    "exploitability": 23.7276
-  },
-  {
-    "iterations": 180000000,
-    "nodes": 1056530,
-    "timestamp": "20260316_153105",
-    "file": "checkpoints/ckpt_180000000.json",
-    "exploitability": 25.9643
-  },
-  {
-    "iterations": 190000000,
-    "nodes": 1056672,
-    "timestamp": "20260316_154013",
-    "file": "checkpoints/ckpt_190000000.json",
-    "exploitability": 24.5501
+    "iterations": 100000000,
+    "nodes": 6006637,
+    "timestamp": "20260318_180957",
+    "file": "checkpoints/ckpt_100000000.json",
+    "exploitability": 127.6831
   },
   {
     "iterations": 200000000,
-    "nodes": 1056752,
-    "timestamp": "20260316_154830",
+    "nodes": 6236768,
+    "timestamp": "20260318_191649",
     "file": "checkpoints/ckpt_200000000.json",
-    "exploitability": 25.5034
+    "exploitability": 1.5466
+  },
+  {
+    "iterations": 300000000,
+    "nodes": 6281961,
+    "timestamp": "20260318_202318",
+    "file": "checkpoints/ckpt_300000000.json",
+    "exploitability": 1.5085
+  },
+  {
+    "iterations": 400000000,
+    "nodes": 6298443,
+    "timestamp": "20260318_213011",
+    "file": "checkpoints/ckpt_400000000.json",
+    "exploitability": 1.5331
   }
 ]

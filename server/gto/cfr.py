@@ -44,7 +44,9 @@ def _parallel_worker(worker_id, n_iters, start_iter, avg_delay, seed,
                      phase_schedule_mode=1, allin_dampen_mode=1,
                      adaptive_averaging=0, regret_discount=1.0,
                      weight_schedule_mode=0, weight_schedule_param=1.0,
-                     action_grid_size=0):
+                     action_grid_size=0, solver_mode=0,
+                     vr_mccfr=0, zhang_alpha=1.5, zhang_c=1.0,
+                     vr_mccfr_warmup=0, emd_mode=0):
     """Worker function for parallel CFR training.
 
     Runs in a forked child process. The node_pool is in shared mmap memory,
@@ -61,7 +63,13 @@ def _parallel_worker(worker_id, n_iters, start_iter, avg_delay, seed,
                          regret_discount=regret_discount,
                          weight_schedule_mode=weight_schedule_mode,
                          weight_schedule_param=weight_schedule_param,
-                         action_grid_size=action_grid_size)
+                         action_grid_size=action_grid_size,
+                         solver_mode=solver_mode,
+                         vr_mccfr=vr_mccfr,
+                         zhang_alpha=zhang_alpha,
+                         zhang_c=zhang_c,
+                         vr_mccfr_warmup=vr_mccfr_warmup,
+                         emd_mode=emd_mode)
 
 PHASES = ['preflop', 'flop', 'turn', 'river']
 
@@ -170,7 +178,13 @@ class CFRTrainer:
               progress_callback=None,
               chunk_size: int = 5000,
               num_workers: int = 1,
-              action_grid_size: int = 0):
+              action_grid_size: int = 0,
+              solver_mode: int = 0,
+              vr_mccfr: int = 0,
+              zhang_alpha: float = 1.5,
+              zhang_c: float = 1.0,
+              vr_mccfr_warmup: int = 0,
+              emd_mode: int = 0):
         """
         Run CFR+ training with per-street traversal and correlated buckets.
 
@@ -203,7 +217,13 @@ class CFRTrainer:
                                             regret_discount=regret_discount,
                                             weight_schedule_mode=weight_schedule_mode,
                                             weight_schedule_param=weight_schedule_param,
-                                            action_grid_size=action_grid_size)
+                                            action_grid_size=action_grid_size,
+                                            solver_mode=solver_mode,
+                                            vr_mccfr=vr_mccfr,
+                                            zhang_alpha=zhang_alpha,
+                                            zhang_c=zhang_c,
+                                            vr_mccfr_warmup=vr_mccfr_warmup,
+                                            emd_mode=emd_mode)
             else:
                 self._train_cython(num_iterations, averaging_delay,
                                    progress_callback=progress_callback,
@@ -214,7 +234,13 @@ class CFRTrainer:
                                    regret_discount=regret_discount,
                                    weight_schedule_mode=weight_schedule_mode,
                                    weight_schedule_param=weight_schedule_param,
-                                   action_grid_size=action_grid_size)
+                                   action_grid_size=action_grid_size,
+                                   solver_mode=solver_mode,
+                                   vr_mccfr=vr_mccfr,
+                                   zhang_alpha=zhang_alpha,
+                                   zhang_c=zhang_c,
+                                   vr_mccfr_warmup=vr_mccfr_warmup,
+                                   emd_mode=emd_mode)
             return
 
         # Python fallback: store config for _cfr_single_street access
@@ -267,7 +293,13 @@ class CFRTrainer:
                       regret_discount: float = 1.0,
                       weight_schedule_mode: int = 0,
                       weight_schedule_param: float = 1.0,
-                      action_grid_size: int = 0):
+                      action_grid_size: int = 0,
+                      solver_mode: int = 0,
+                      vr_mccfr: int = 0,
+                      zhang_alpha: float = 1.5,
+                      zhang_c: float = 1.0,
+                      vr_mccfr_warmup: int = 0,
+                      emd_mode: int = 0):
         """Run training using Cython-accelerated CFR.
 
         Args:
@@ -280,6 +312,7 @@ class CFRTrainer:
             weight_schedule_mode: 0=linear, 1=exponential, 2=polynomial.
             weight_schedule_param: parameter for weight schedule (base/power).
             action_grid_size: 0=use current, 13=v6/B0, 16=v9 expanded.
+            vr_mccfr_warmup: iters of standard CFR+ before VR-MCCFR activation.
         """
         # Set action grid before training
         if action_grid_size > 0:
@@ -309,6 +342,12 @@ class CFRTrainer:
                 weight_schedule_mode=weight_schedule_mode,
                 weight_schedule_param=weight_schedule_param,
                 action_grid_size=action_grid_size,
+                solver_mode=solver_mode,
+                vr_mccfr=vr_mccfr,
+                zhang_alpha=zhang_alpha,
+                zhang_c=zhang_c,
+                vr_mccfr_warmup=vr_mccfr_warmup,
+                emd_mode=emd_mode,
             )
             done += batch
 
@@ -328,7 +367,13 @@ class CFRTrainer:
                                regret_discount: float = 1.0,
                                weight_schedule_mode: int = 0,
                                weight_schedule_param: float = 1.0,
-                               action_grid_size: int = 0):
+                               action_grid_size: int = 0,
+                               solver_mode: int = 0,
+                               vr_mccfr: int = 0,
+                               zhang_alpha: float = 1.5,
+                               zhang_c: float = 1.0,
+                               vr_mccfr_warmup: int = 0,
+                               emd_mode: int = 0):
         """Parallel CFR+ using shared memory and multiprocessing.
 
         Phase 1 (warmup): Single-threaded training to discover all game tree
@@ -353,7 +398,7 @@ class CFRTrainer:
             _cfr_fast.set_action_grid_size(action_grid_size)
 
         # Pre-allocate shared memory pool (2M nodes, ~430 MB)
-        _cfr_fast.init_pool_shared(2_000_000)
+        _cfr_fast.init_pool_shared(10_000_000)
 
         # Export existing nodes if continuing training
         if self.nodes:
@@ -379,6 +424,12 @@ class CFRTrainer:
                 weight_schedule_mode=weight_schedule_mode,
                 weight_schedule_param=weight_schedule_param,
                 action_grid_size=action_grid_size,
+                solver_mode=solver_mode,
+                vr_mccfr=vr_mccfr,
+                zhang_alpha=zhang_alpha,
+                zhang_c=zhang_c,
+                vr_mccfr_warmup=vr_mccfr_warmup,
+                emd_mode=emd_mode,
             )
             done += batch
             if progress_callback:
@@ -407,7 +458,9 @@ class CFRTrainer:
                       phase_schedule_mode, allin_dampen_mode,
                       adaptive_averaging, regret_discount,
                       weight_schedule_mode, weight_schedule_param,
-                      action_grid_size))
+                      action_grid_size, solver_mode,
+                      vr_mccfr, zhang_alpha, zhang_c,
+                      vr_mccfr_warmup, emd_mode))
             processes.append(p)
             p.start()
 
@@ -428,15 +481,24 @@ class CFRTrainer:
         phase_map = {'preflop': 0, 'flop': 1, 'turn': 2, 'river': 3}
         pos_map = {'oop': 0, 'ip': 1, '': 0}
 
+        from server.gto.abstraction import EMD_MODE
+
         export_dict = {}
         for str_key, node in self.nodes.items():
-            # Parse the string key: phase:position:bucket:history
+            # Parse the string key:
+            #   standard: phase:position:bucket:history
+            #   EMD mode: phase:position:bucket:texture:history
             parts = str_key.split(':')
-            if len(parts) == 4:
+            if EMD_MODE and len(parts) == 5:
+                phase_str, pos_str, bucket_str, texture_str, hist_str = parts
+                texture = int(texture_str)
+            elif len(parts) == 4:
                 phase_str, pos_str, bucket_str, hist_str = parts
+                texture = 0
             elif len(parts) == 3:
                 phase_str, bucket_str, hist_str = parts
                 pos_str = ''
+                texture = 0
             else:
                 continue
 
@@ -449,6 +511,8 @@ class CFRTrainer:
             int_key = phase
             int_key = (int_key << 1) | position
             int_key = (int_key << 8) | bucket
+            if EMD_MODE:
+                int_key = (int_key << 2) | (texture & 3)
             for a in history:
                 int_key = (int_key << 4) | a
             int_key = (int_key << 4) | len(history)
@@ -500,6 +564,13 @@ class CFRTrainer:
             int_key >>= 4
         history.reverse()
 
+        # Extract texture (2 bits) if EMD mode
+        from server.gto.abstraction import EMD_MODE
+        texture = 0
+        if EMD_MODE:
+            texture = int_key & 0x3
+            int_key >>= 2
+
         # Extract bucket (8 bits)
         bucket = int_key & 0xFF
         int_key >>= 8
@@ -515,6 +586,8 @@ class CFRTrainer:
         pos_str = pos_names.get(position, 'oop')
         hist_str = ''.join(str(a) for a in history)
 
+        if EMD_MODE:
+            return f"{phase_str}:{pos_str}:{bucket}:{texture}:{hist_str}"
         return f"{phase_str}:{pos_str}:{bucket}:{hist_str}"
 
     def _sample_street_buckets(self) -> dict[str, int]:
