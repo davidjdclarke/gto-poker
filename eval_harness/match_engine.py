@@ -15,10 +15,12 @@ from server.deck import Deck, Card
 from server.evaluator import best_hand, determine_winners
 from server.gto.equity import hand_strength_bucket
 from server.gto.abstraction import (
-    Action, ACTION_NAMES, InfoSet, NUM_BUCKETS,
+    Action, ACTION_NAMES, InfoSet, NUM_BUCKETS, EMD_MODE,
     get_available_actions, count_raises, decode_bucket,
-    concrete_to_abstract_history,
+    concrete_to_abstract_history, pseudo_harmonic_translate,
+    texture_for_key,
 )
+from server.gto.board_texture import classify_board_texture
 from server.gto.cfr import CFRTrainer
 from server.gto.opponent_model import OpponentProfile
 from eval_harness.fast_equity import fast_bucket
@@ -76,10 +78,10 @@ class GTOAgent(Agent):
 
     def __init__(self, trainer: CFRTrainer, name: str = "GTO",
                  mapping: str = "confidence_nearest", simulations: int = 80,
-                 opponent_profile: "OpponentProfile | None" = None):
+                 opponent_profile: "OpponentProfile | None" = None, **kwargs):
         self.trainer = trainer
         self.name = name
-        self.mapping = mapping  # nearest, conservative, stochastic, resolve, blend, refine
+        self.mapping = mapping  # nearest, conservative, stochastic, resolve, blend, refine, pseudo_harmonic, embedding
         self.simulations = simulations
         self.opponent_profile = opponent_profile
         # Local refiner (lazy init for "refine" mapping)
@@ -87,6 +89,29 @@ class GTOAgent(Agent):
         if mapping == "refine":
             from server.gto.local_refine import LocalRefiner
             self._refiner = LocalRefiner(trainer)
+        # Embedding model (lazy init for "embedding" mapping — WS5b)
+        self._embedding_model = None
+        self._embedding_centroids = None
+        self._embedding_k = kwargs.get('embedding_k', 3)
+        if mapping in ("embedding", "embedding_ph"):
+            import logging as _log
+            model_path = kwargs.get('embedding_model_path',
+                                    'server/gto/embedding_weights.json')
+            try:
+                from server.gto.embedding_model import EmbeddingMLP
+                loaded = EmbeddingMLP.load(model_path)
+                self._embedding_model = loaded['model']
+                self._embedding_centroids = loaded.get('centroids')
+                if self._embedding_centroids is None:
+                    _log.getLogger(__name__).warning(
+                        "Embedding model at %s has no centroids, "
+                        "falling back to confidence_nearest", model_path)
+                    self.mapping = "confidence_nearest"
+            except FileNotFoundError:
+                _log.getLogger(__name__).warning(
+                    "Embedding model not found at %s, "
+                    "falling back to confidence_nearest", model_path)
+                self.mapping = "confidence_nearest"
         # Diagnostics
         self.lookup_hits = 0
         self.lookup_misses = 0
@@ -126,7 +151,13 @@ class GTOAgent(Agent):
                                        history_len=len(history),
                                        eq_bucket=decode_bucket(bucket)[0])
 
-        info_set = InfoSet(bucket, ctx.phase, history, position=pos_from_hist)
+        # WS5: compute board texture for postflop infoset key
+        texture = 0
+        if EMD_MODE and ctx.community_cards:
+            texture = texture_for_key(int(classify_board_texture(ctx.community_cards)))
+
+        info_set = InfoSet(bucket, ctx.phase, history, position=pos_from_hist,
+                           texture=texture)
         key = info_set.key
 
         if key in self.trainer.nodes:
@@ -144,6 +175,68 @@ class GTOAgent(Agent):
             uniform = 1.0 / len(actions)
             strategy = {int(a): uniform for a in actions}
             self.lookup_misses += 1
+
+        # Embedding CFR: K-nearest centroid strategy interpolation (WS5b)
+        # Replaces the hard-bucket lookup with a soft interpolation over the
+        # K nearest bucket centroids in learned embedding space.
+        if self.mapping in ("embedding", "embedding_ph") and self._embedding_model is not None:
+            from server.gto.embedding_model import extract_features, embedding_strategy
+            features = extract_features(ctx.hole_cards, ctx.community_cards,
+                                        ctx.phase, texture=texture)
+            strategy = embedding_strategy(
+                self._embedding_model, self._embedding_centroids,
+                self.trainer, features, ctx.phase, history, pos_from_hist,
+                K=self._embedding_k, texture=texture)
+            # Track hit/miss based on primary bucket for diagnostics
+            if key in self.trainer.nodes:
+                self.lookup_hits += 1
+            else:
+                self.lookup_misses += 1
+
+        # Pseudo-harmonic blending for off-tree opponent bets (WS0)
+        # Ganzfried & Sandholm IJCAI 2013 — provably less exploitable than nearest.
+        # Replaces the single strategy lookup with a weighted blend of the two
+        # strategies that bracket the concrete bet.  Preflop is skipped (pot
+        # fractions are not meaningful for open/3bet/4bet sizing).
+        if self.mapping in ("pseudo_harmonic", "embedding_ph") and ctx.phase != "preflop":
+            to_call = ctx.current_bet - ctx.my_bet
+            if to_call > 0 and ctx.pot > 0 and history:
+                # Use pot BEFORE the opponent's bet (standard poker convention:
+                # "half-pot bet" = 0.5, "pot bet" = 1.0).
+                # ctx.pot already includes the opponent's bet, so subtract it.
+                pre_bet_pot = ctx.pot - to_call
+                concrete_ratio = (to_call / pre_bet_pot
+                                  if pre_bet_pot > 1e-6
+                                  else to_call / ctx.pot)
+                lower_id, upper_id, p_lower = pseudo_harmonic_translate(concrete_ratio)
+                if lower_id != upper_id:
+                    base_history = history[:-1]
+                    hist_lower = base_history + (lower_id,)
+                    hist_upper = base_history + (upper_id,)
+
+                    def _ph_lookup(hist):
+                        k = InfoSet(bucket, ctx.phase, hist,
+                                    position=pos_from_hist,
+                                    texture=texture).key
+                        n = self.trainer.nodes.get(k)
+                        if n is not None:
+                            avg = n.get_average_strategy()
+                            if len(avg) == len(actions):
+                                return {int(actions[i]): float(avg[i])
+                                        for i in range(len(actions))}
+                        return {int(a): 1.0 / len(actions) for a in actions}
+
+                    s_lower = _ph_lookup(hist_lower)
+                    s_upper = _ph_lookup(hist_upper)
+
+                    blended = {
+                        int(a): (p_lower * s_lower.get(int(a), 0.0) +
+                                 (1.0 - p_lower) * s_upper.get(int(a), 0.0))
+                        for a in actions
+                    }
+                    total = sum(blended.values())
+                    if total > 1e-10:
+                        strategy = {a: v / total for a, v in blended.items()}
 
         # Apply mapping adjustments before sampling
         if self.mapping == "conservative":
@@ -163,7 +256,7 @@ class GTOAgent(Agent):
 
         # Apply blend mapping: mix trained strategy with equity heuristic
         # "refine" also gets confidence_nearest as a base layer
-        if self.mapping in ("blend", "confidence_nearest", "refine"):
+        if self.mapping in ("blend", "confidence_nearest", "refine", "pseudo_harmonic", "embedding", "embedding_ph"):
             from eval_harness.confidence import (
                 compute_confidence, equity_heuristic, blend_strategies)
             eq_bucket, _ = decode_bucket(bucket)
@@ -178,7 +271,7 @@ class GTOAgent(Agent):
             alpha = compute_confidence(strategy, visit_count,
                                        concrete_bet_ratio=concrete_bet_ratio,
                                        mapped_action=mapped_action_id)
-            if self.mapping in ("confidence_nearest", "refine") and alpha < 0.05:
+            if self.mapping in ("confidence_nearest", "refine", "pseudo_harmonic", "embedding", "embedding_ph") and alpha < 0.05:
                 pass
             else:
                 heuristic = equity_heuristic(eq_bucket, has_bet, ctx.phase)

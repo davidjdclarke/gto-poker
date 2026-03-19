@@ -54,7 +54,9 @@ _DEFAULT_BUCKET_EV_PATH = Path(__file__).parent / "eval_harness" / "bucket_ev_ta
 def _play_one_matchup(opp_index: int, num_hands: int, seed: int,
                       big_blind: int, use_aivat: bool = False,
                       bucket_ev_path: str = None,
-                      mapping: str = "confidence_nearest") -> dict:
+                      mapping: str = "confidence_nearest",
+                      embedding_model_path: str = None,
+                      embedding_k: int = 3) -> dict:
     """Worker function for parallel gauntlet. Loads trainer in-process."""
     from eval_harness.match_engine import GTOAgent, HeadsUpMatch
     from eval_harness.adversaries import get_all_adversaries
@@ -65,7 +67,9 @@ def _play_one_matchup(opp_index: int, num_hands: int, seed: int,
 
     opp_profile = OpponentProfile() if _USE_OPPONENT_MODEL else None
     gto = GTOAgent(trainer, name="GTO", simulations=80, mapping=mapping,
-                   opponent_profile=opp_profile)
+                   opponent_profile=opp_profile,
+                   embedding_model_path=embedding_model_path,
+                   embedding_k=embedding_k)
     adversaries = get_all_adversaries(trainer)
     opp = adversaries[opp_index]
 
@@ -80,10 +84,23 @@ def _play_one_matchup(opp_index: int, num_hands: int, seed: int,
                     if num_hands > 0 else 0)
 
     aivat_bb100 = None
+    aivat_source = None
     if use_aivat:
         try:
-            from eval_harness.aivat import load_bucket_ev_table, aivat_adjusted_result
-            bev = load_bucket_ev_table(bucket_ev_path)
+            from eval_harness.aivat import (
+                load_bucket_ev_table, aivat_adjusted_result,
+                load_opponent_bucket_ev_table, opponent_ev_table_exists,
+            )
+            # Prefer per-opponent calibration table (WS7); fall back to global
+            if opponent_ev_table_exists(opp.name):
+                bev = load_opponent_bucket_ev_table(opp.name)
+                aivat_source = "per_opponent"
+            elif bucket_ev_path:
+                bev = load_bucket_ev_table(bucket_ev_path)
+                aivat_source = "global"
+            else:
+                bev = load_bucket_ev_table()
+                aivat_source = "global"
             ar = aivat_adjusted_result(match_result, bev, gto_player=0,
                                        big_blind=float(big_blind))
             aivat_bb100 = ar.aivat_bb100
@@ -94,6 +111,7 @@ def _play_one_matchup(opp_index: int, num_hands: int, seed: int,
         "opp_name": opp.name,
         "bb_per_100": round(bb100, 2),
         "aivat_bb_per_100": round(aivat_bb100, 2) if aivat_bb100 is not None else None,
+        "aivat_source": aivat_source,
         "showdown_pct": round(showdown_pct, 1),
         "num_hands": num_hands,
         "p0_total_bb": round(match_result.p0_total_won, 2),
@@ -107,7 +125,9 @@ def _play_one_matchup(opp_index: int, num_hands: int, seed: int,
 def run_gauntlet(trainer: CFRTrainer, num_hands: int, seed: int,
                  big_blind: int, parallel: bool = True,
                  use_aivat: bool = False, bucket_ev_path: str = None,
-                 mapping: str = "confidence_nearest") -> dict:
+                 mapping: str = "confidence_nearest",
+                 embedding_model_path: str = None,
+                 embedding_k: int = 3) -> dict:
     """Run GTO agent against all adversaries and measure bb/100."""
     from eval_harness.match_engine import GTOAgent, HeadsUpMatch
     from eval_harness.adversaries import get_all_adversaries
@@ -128,7 +148,8 @@ def run_gauntlet(trainer: CFRTrainer, num_hands: int, seed: int,
         with ProcessPoolExecutor(max_workers=workers) as pool:
             futures = {
                 pool.submit(_play_one_matchup, i, num_hands, seed, big_blind,
-                            use_aivat, bucket_ev_path, mapping): i
+                            use_aivat, bucket_ev_path, mapping,
+                            embedding_model_path, embedding_k): i
                 for i in range(num_opps)
             }
             total_hits = 0
@@ -176,7 +197,9 @@ def run_gauntlet(trainer: CFRTrainer, num_hands: int, seed: int,
         for opp in tqdm(adversaries, desc="  Gauntlet", unit="matchup", leave=True):
             opp_profile = OpponentProfile() if _USE_OPPONENT_MODEL else None
             gto = GTOAgent(trainer, name="GTO", simulations=80, mapping=mapping,
-                           opponent_profile=opp_profile)
+                           opponent_profile=opp_profile,
+                           embedding_model_path=embedding_model_path,
+                           embedding_k=embedding_k)
             t0 = time.time()
             match = HeadsUpMatch(gto, opp, big_blind=big_blind, seed=seed,
                                  detailed_tracking=use_aivat)
@@ -242,7 +265,9 @@ def run_gauntlet_multiseed(trainer: CFRTrainer, num_hands: int,
                            parallel: bool = True,
                            use_aivat: bool = False,
                            bucket_ev_path: str = None,
-                           mapping: str = "confidence_nearest") -> dict:
+                           mapping: str = "confidence_nearest",
+                           embedding_model_path: str = None,
+                           embedding_k: int = 3) -> dict:
     """Run gauntlet across multiple seeds and compute per-bot statistics.
 
     Returns dict with per-bot mean/std/CI and per-seed raw values.
@@ -274,7 +299,8 @@ def run_gauntlet_multiseed(trainer: CFRTrainer, num_hands: int,
         with ProcessPoolExecutor(max_workers=workers) as pool:
             futures = {
                 pool.submit(_play_one_matchup, opp_i, num_hands, seed, big_blind,
-                            use_aivat, bucket_ev_path, mapping): (opp_i, seed)
+                            use_aivat, bucket_ev_path, mapping,
+                            embedding_model_path, embedding_k): (opp_i, seed)
                 for opp_i, seed in tasks
             }
             pbar = tqdm(as_completed(futures), total=total_tasks,
@@ -290,7 +316,8 @@ def run_gauntlet_multiseed(trainer: CFRTrainer, num_hands: int,
     else:
         for opp_i, seed_val in tqdm(tasks, desc="  Gauntlet", unit="matchup"):
             r = _play_one_matchup(opp_i, num_hands, seed_val, big_blind,
-                                  use_aivat, bucket_ev_path, mapping)
+                                  use_aivat, bucket_ev_path, mapping,
+                                  embedding_model_path, embedding_k)
             raw[r["opp_name"]][seed_val] = r
 
     # Compute per-bot statistics
@@ -564,7 +591,9 @@ def run_leakage(trainer: CFRTrainer) -> dict:
 def _play_one_matchup_advanced(opp_index: int, num_hands: int, seed: int,
                                 big_blind: int, use_aivat: bool = False,
                                 bucket_ev_path: str = None,
-                                mapping: str = "confidence_nearest") -> dict:
+                                mapping: str = "confidence_nearest",
+                                embedding_model_path: str = None,
+                                embedding_k: int = 3) -> dict:
     """Worker for parallel advanced gauntlet. Loads trainer in-process."""
     from eval_harness.match_engine import GTOAgent, HeadsUpMatch
     from eval_harness.advanced_adversaries import get_advanced_adversaries
@@ -573,7 +602,9 @@ def _play_one_matchup_advanced(opp_index: int, num_hands: int, seed: int,
     trainer = get_trainer()
     build_preflop_cache(simulations=200)
 
-    gto = GTOAgent(trainer, name="GTO", simulations=80, mapping=mapping)
+    gto = GTOAgent(trainer, name="GTO", simulations=80, mapping=mapping,
+                   embedding_model_path=embedding_model_path,
+                   embedding_k=embedding_k)
     bots = get_advanced_adversaries(trainer)
     opp = bots[opp_index]
 
@@ -615,7 +646,9 @@ def _play_one_matchup_advanced(opp_index: int, num_hands: int, seed: int,
 def run_advanced_gauntlet(trainer: CFRTrainer, num_hands: int, seed: int,
                           big_blind: int, parallel: bool = True,
                           use_aivat: bool = False, bucket_ev_path: str = None,
-                          mapping: str = "confidence_nearest") -> dict:
+                          mapping: str = "confidence_nearest",
+                          embedding_model_path: str = None,
+                          embedding_k: int = 3) -> dict:
     """Run GTO agent against the 12-bot advanced adversary pool (single seed)."""
     from eval_harness.advanced_adversaries import (
         get_advanced_adversaries, advanced_gauntlet_summary)
@@ -636,7 +669,8 @@ def run_advanced_gauntlet(trainer: CFRTrainer, num_hands: int, seed: int,
         with ProcessPoolExecutor(max_workers=workers) as pool:
             futures = {
                 pool.submit(_play_one_matchup_advanced, i, num_hands, seed, big_blind,
-                            use_aivat, bucket_ev_path, mapping): i
+                            use_aivat, bucket_ev_path, mapping,
+                            embedding_model_path, embedding_k): i
                 for i in range(num_opps)
             }
             pbar = tqdm(as_completed(futures), total=num_opps,
@@ -670,7 +704,9 @@ def run_advanced_gauntlet(trainer: CFRTrainer, num_hands: int, seed: int,
             except FileNotFoundError:
                 print("  [WARN] AIVAT: bucket-EV table not found")
         for i, opp in enumerate(tqdm(bots, desc="  Advanced", unit="matchup", leave=True)):
-            gto = GTOAgent(trainer, name="GTO", simulations=80, mapping=mapping)
+            gto = GTOAgent(trainer, name="GTO", simulations=80, mapping=mapping,
+                           embedding_model_path=embedding_model_path,
+                           embedding_k=embedding_k)
             t0 = time.time()
             match = HeadsUpMatch(gto, opp, big_blind=big_blind, seed=seed,
                                  detailed_tracking=use_aivat)
@@ -723,7 +759,9 @@ def run_advanced_gauntlet_multiseed(trainer: CFRTrainer, num_hands: int,
                                     parallel: bool = True,
                                     use_aivat: bool = False,
                                     bucket_ev_path: str = None,
-                                    mapping: str = "confidence_nearest") -> dict:
+                                    mapping: str = "confidence_nearest",
+                                    embedding_model_path: str = None,
+                                    embedding_k: int = 3) -> dict:
     """Run advanced gauntlet across multiple seeds."""
     from eval_harness.advanced_adversaries import (
         get_advanced_adversaries, advanced_gauntlet_summary)
@@ -748,7 +786,8 @@ def run_advanced_gauntlet_multiseed(trainer: CFRTrainer, num_hands: int,
         with ProcessPoolExecutor(max_workers=workers) as pool:
             futures = {
                 pool.submit(_play_one_matchup_advanced, opp_i, num_hands, seed, big_blind,
-                            use_aivat, bucket_ev_path, mapping): (opp_i, seed)
+                            use_aivat, bucket_ev_path, mapping,
+                            embedding_model_path, embedding_k): (opp_i, seed)
                 for opp_i, seed in tasks
             }
             pbar = tqdm(as_completed(futures), total=total_tasks,
@@ -763,7 +802,8 @@ def run_advanced_gauntlet_multiseed(trainer: CFRTrainer, num_hands: int,
     else:
         for opp_i, seed_val in tqdm(tasks, desc="  Advanced", unit="matchup"):
             r = _play_one_matchup_advanced(opp_i, num_hands, seed_val, big_blind,
-                                           use_aivat, bucket_ev_path, mapping)
+                                           use_aivat, bucket_ev_path, mapping,
+                                           embedding_model_path, embedding_k)
             raw[r["opp_name"]][seed_val] = r
 
     n_seeds = len(seeds)
@@ -835,8 +875,14 @@ def main():
                         help="Disable opponent model adjustments (default since v11)")
     parser.add_argument("--mapping", type=str, default="confidence_nearest",
                         choices=["nearest", "conservative", "stochastic",
-                                 "confidence_nearest", "refine"],
+                                 "confidence_nearest", "refine",
+                                 "pseudo_harmonic", "embedding",
+                                 "embedding_ph"],
                         help="GTOAgent mapping mode (default: confidence_nearest)")
+    parser.add_argument("--embedding-model", type=str, default=None,
+                        help="Path to embedding weights JSON (for mapping=embedding)")
+    parser.add_argument("--embedding-k", type=int, default=3,
+                        help="K nearest centroids to blend for embedding mapping (default 3)")
     parser.add_argument("--opponent-model", action="store_true",
                         help="Enable opponent model (disabled by default since v11)")
     parser.add_argument("--strategy", type=str, default=None, help="Path to strategy JSON file (default: server/gto/strategy.json)")
@@ -846,18 +892,40 @@ def main():
     parser.add_argument("--build-bucket-ev", action="store_true",
                         help="Build and save the AIVAT bucket-EV calibration table "
                              "before running the gauntlet (10k hands GTO self-play)")
+    parser.add_argument("--build-opponent-aivat", type=str, default=None, metavar="BOTNAME",
+                        help="Build per-opponent AIVAT calibration table for a specific bot "
+                             "(e.g. NitBot). Use 'all' to build for all 7 classic gauntlet bots.")
+    parser.add_argument("--opponent-aivat-hands", type=int, default=5000,
+                        help="Calibration hands for per-opponent AIVAT table (default 5000)")
     parser.add_argument("--slumbot", action="store_true",
                         help="Run pilot match against Slumbot API (requires network + requests)")
-    parser.add_argument("--slumbot-hands", type=int, default=100,
-                        help="Hands to play against Slumbot (default 100)")
+    parser.add_argument("--slumbot-hands", type=int, default=10000,
+                        help="Hands to play against Slumbot (default 10000)")
     parser.add_argument("--slumbot-bb", type=int, default=200,
                         help="Slumbot big blind in chips (default 200)")
+    parser.add_argument("--slumbot-seeds", type=str, default=None,
+                        help="Comma-separated seeds for multi-seed Slumbot run (e.g. 42,123,456)")
+    parser.add_argument("--slumbot-mapping", type=str, default="pseudo_harmonic",
+                        choices=["nearest", "conservative", "stochastic",
+                                 "confidence_nearest", "refine", "pseudo_harmonic"],
+                        help="GTOAgent mapping mode for Slumbot (default: pseudo_harmonic)")
+    parser.add_argument("--slumbot-rate-limit", type=float, default=0.5,
+                        help="Seconds between Slumbot API requests (default 0.5; lower = faster but riskier)")
     parser.add_argument("--tier2", action="store_true",
                         help="Run Tier-2 external calibration (OpenSpiel). Not yet implemented.")
+    parser.add_argument("--emd-buckets", action="store_true",
+                        help="Enable EMD+texture bucketing (WS4+WS5: K=12 clusters, 4 board textures)")
     args = parser.parse_args()
 
     if args.quick:
         args.hands = 100
+
+    # WS4+WS5: enable EMD bucketing + board texture
+    if args.emd_buckets:
+        from server.gto.abstraction import enable_emd_mode
+        enable_emd_mode()
+        from server.gto import equity as _eq
+        _eq.EMD_MODE_ENABLED = True
 
     # Apply opponent model flag (disabled by default since v11)
     global _USE_OPPONENT_MODEL
@@ -865,7 +933,8 @@ def main():
         _USE_OPPONENT_MODEL = True
 
     run_all = not (args.gauntlet or args.offtree or args.bridge or args.leakage
-                   or args.behavioral or args.slumbot or args.tier2)
+                   or args.behavioral or args.slumbot or args.tier2
+                   or args.build_opponent_aivat)
 
     # Load strategy
     if not args.strategy:
@@ -903,6 +972,37 @@ def main():
             print(f"  Loaded bucket-EV table "
                   f"({sum(len(v) for v in _bucket_ev_table.values())} entries)")
 
+    # Build per-opponent AIVAT calibration tables if requested (WS7)
+    if args.build_opponent_aivat:
+        from eval_harness.adversaries import get_all_adversaries
+        from eval_harness.aivat import build_and_save_opponent_bucket_ev_table
+        adversaries = get_all_adversaries(trainer)
+        target_name = args.build_opponent_aivat.strip()
+        if target_name.lower() == "all":
+            targets = adversaries
+        else:
+            targets = [a for a in adversaries
+                       if a.name.lower() == target_name.lower()]
+            if not targets:
+                names = [a.name for a in adversaries]
+                print(f"  [ERROR] Bot '{target_name}' not found. "
+                      f"Available: {names}")
+                sys.exit(1)
+
+        print(f"\n  Building per-opponent AIVAT tables for "
+              f"{len(targets)} bot(s) ({args.opponent_aivat_hands:,} hands each)...")
+        for opp in targets:
+            build_and_save_opponent_bucket_ev_table(
+                trainer, opp,
+                num_hands=args.opponent_aivat_hands,
+                seed=0,
+                big_blind=args.bb,
+            )
+        print(f"  Per-opponent AIVAT calibration complete.")
+        if not (run_all or args.gauntlet or args.offtree or
+                args.bridge or args.leakage or args.slumbot):
+            sys.exit(0)
+
     all_results = {}
 
     # Build stage list
@@ -925,6 +1025,9 @@ def main():
     stage_bar = tqdm(stages, desc="Overall", unit="stage", leave=True,
                      bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} stages [{elapsed}<{remaining}]")
 
+    embedding_model_path = getattr(args, 'embedding_model', None)
+    embedding_k = getattr(args, 'embedding_k', 3)
+
     for stage in stage_bar:
         stage_bar.set_postfix_str(stage)
         if stage == "gauntlet":
@@ -943,13 +1046,17 @@ def main():
                         trainer, args.hands, seed_list, args.bb,
                         parallel=not args.no_parallel,
                         use_aivat=args.aivat, bucket_ev_path=_bev_path,
-                        mapping=args.mapping)
+                        mapping=args.mapping,
+                        embedding_model_path=embedding_model_path,
+                        embedding_k=embedding_k)
                 else:
                     classic_result = run_gauntlet(
                         trainer, args.hands, args.seed, args.bb,
                         parallel=not args.no_parallel,
                         use_aivat=args.aivat, bucket_ev_path=_bev_path,
-                        mapping=args.mapping)
+                        mapping=args.mapping,
+                        embedding_model_path=embedding_model_path,
+                        embedding_k=embedding_k)
 
             if gauntlet_mode in ("advanced", "full"):
                 if seed_list:
@@ -957,13 +1064,17 @@ def main():
                         trainer, args.hands, seed_list, args.bb,
                         parallel=not args.no_parallel,
                         use_aivat=args.aivat, bucket_ev_path=_bev_path,
-                        mapping=args.mapping)
+                        mapping=args.mapping,
+                        embedding_model_path=embedding_model_path,
+                        embedding_k=embedding_k)
                 else:
                     advanced_result = run_advanced_gauntlet(
                         trainer, args.hands, args.seed, args.bb,
                         parallel=not args.no_parallel,
                         use_aivat=args.aivat, bucket_ev_path=_bev_path,
-                        mapping=args.mapping)
+                        mapping=args.mapping,
+                        embedding_model_path=embedding_model_path,
+                        embedding_k=embedding_k)
 
             if gauntlet_mode == "classic":
                 all_results["gauntlet"] = classic_result
@@ -1000,23 +1111,62 @@ def main():
                     SlumbotMatch, SlumbotMatchConfig)
                 from eval_harness.match_engine import GTOAgent
 
-                gto = GTOAgent(trainer, name="GTO", mapping="refine", simulations=80)
-                client = SlumbotClient()
+                slumbot_mapping = args.slumbot_mapping
+                slumbot_seed_list = (
+                    [int(s.strip()) for s in args.slumbot_seeds.split(",")]
+                    if args.slumbot_seeds else [args.seed]
+                )
+                print(f"  Config: {args.slumbot_hands} hands, "
+                      f"bb={args.slumbot_bb}, mapping={slumbot_mapping}, "
+                      f"seeds={slumbot_seed_list}")
+
+                gto = GTOAgent(trainer, name="GTO",
+                               mapping=slumbot_mapping, simulations=80)
+                client = SlumbotClient(rate_limit_s=args.slumbot_rate_limit)
                 config = SlumbotMatchConfig(big_blind=args.slumbot_bb)
                 match = SlumbotMatch(gto, client, config=config)
-                print(f"  Playing {args.slumbot_hands} hands vs Slumbot "
-                      f"(bb={args.slumbot_bb})...")
-                t0 = time.time()
-                slumbot_result = match.play(args.slumbot_hands)
-                elapsed = time.time() - t0
-                bb100 = slumbot_result.p0_bb_per_100
-                status = "PASS" if bb100 > -20 else "WARN" if bb100 > -50 else "FAIL"
-                print(f"  [{status}] GTO vs Slumbot: {bb100:+.1f} bb/100 ({elapsed:.1f}s)")
+
+                seed_results = []
+                t0_total = time.time()
+                for slumbot_seed in slumbot_seed_list:
+                    config.seed = slumbot_seed
+                    print(f"  Playing {args.slumbot_hands} hands "
+                          f"(seed={slumbot_seed})...")
+                    t0 = time.time()
+                    slumbot_result = match.play(args.slumbot_hands)
+                    elapsed = time.time() - t0
+                    bb100 = slumbot_result.p0_bb_per_100
+                    status = "PASS" if bb100 > 0 else "WARN" if bb100 > -50 else "FAIL"
+                    print(f"  [{status}] seed={slumbot_seed}: "
+                          f"{bb100:+.1f} bb/100 ({elapsed:.1f}s)")
+                    seed_results.append({
+                        "seed": slumbot_seed,
+                        "bb_per_100": round(bb100, 2),
+                        "num_hands": args.slumbot_hands,
+                        "elapsed": round(elapsed, 1),
+                    })
+
+                total_elapsed = time.time() - t0_total
+                all_bb = [r["bb_per_100"] for r in seed_results]
+                mean_bb = float(np.mean(all_bb))
+                ci = (1.96 * float(np.std(all_bb, ddof=1)) / math.sqrt(len(all_bb))
+                      if len(all_bb) > 1 else 0.0)
+                status = "PASS" if mean_bb > 0 else "WARN" if mean_bb > -50 else "FAIL"
+                print(f"\n  [{status}] GTO vs Slumbot: {mean_bb:+.1f} bb/100 "
+                      f"(±{ci:.1f} CI, {len(slumbot_seed_list)} seeds, "
+                      f"{total_elapsed:.1f}s total)")
+                if mean_bb < 0:
+                    print(f"  [INFO] Negative result — review strategy divergence "
+                          f"for WS0/WS1 targets")
+
                 all_results["slumbot"] = {
-                    "bb_per_100": round(bb100, 2),
-                    "num_hands": args.slumbot_hands,
+                    "mean_bb_per_100": round(mean_bb, 2),
+                    "ci_95": round(ci, 2),
+                    "mapping": slumbot_mapping,
+                    "num_hands_per_seed": args.slumbot_hands,
                     "big_blind": args.slumbot_bb,
-                    "elapsed": round(elapsed, 1),
+                    "seeds": seed_results,
+                    "total_elapsed": round(total_elapsed, 1),
                 }
             except ImportError as e:
                 print(f"  [SKIP] Slumbot benchmark requires 'requests': {e}")
@@ -1087,6 +1237,16 @@ def main():
         beh = all_results["behavioral"]
         families_with_nodes = sum(1 for r in beh.values() if r.get('num_nodes', 0) > 0)
         print(f"  [INFO] Behavioral: {families_with_nodes}/6 families audited")
+
+    if "slumbot" in all_results:
+        s = all_results["slumbot"]
+        if "error" not in s:
+            mean_bb = s.get("mean_bb_per_100", 0)
+            ci = s.get("ci_95", 0)
+            n_seeds = len(s.get("seeds", []))
+            status = "PASS" if mean_bb > 0 else "WARN" if mean_bb > -50 else "FAIL"
+            print(f"  [{status}] Slumbot: {mean_bb:+.1f} ±{ci:.1f} bb/100 "
+                  f"({n_seeds} seed(s), mapping={s.get('mapping', '?')})")
 
     # Save results
     if args.save:

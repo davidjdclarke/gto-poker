@@ -18,7 +18,7 @@ from server.deck import Card, SUITS
 from server.evaluator import best_hand
 from server.gto.equity import hand_equity, make_deck
 from server.gto.abstraction import (
-    classify_hand_type, make_bucket, NUM_EQUITY_BUCKETS,
+    classify_hand_type, make_bucket, NUM_EQUITY_BUCKETS, NUM_HAND_TYPES,
 )
 
 # Try to use Cython-accelerated equity (~47x faster)
@@ -185,6 +185,27 @@ def cached_postflop_bucket(hole_cards: list[Card], community: list[Card],
 
 
 # ---------------------------------------------------------------------------
+# Fast equity float (for embedding model feature extraction)
+# ---------------------------------------------------------------------------
+def fast_equity_float(hole_cards: list[Card], community: list[Card],
+                      simulations: int = 100) -> float:
+    """Return raw equity float in [0, 1] for embedding feature extraction.
+
+    Preflop: approximates from cached bucket (avoids MC).
+    Postflop: uses Cython equity if available, else Python fallback.
+    """
+    if not community:
+        # Approximate from cached preflop bucket
+        bucket = get_preflop_bucket(hole_cards)
+        eq_bucket = bucket // NUM_HAND_TYPES
+        return (eq_bucket + 0.5) / NUM_EQUITY_BUCKETS
+    if _HAS_FAST_EVAL:
+        return float(_cy_equity(hole_cards, community, simulations=simulations))
+    return float(hand_equity(hole_cards, community, num_opponents=1,
+                             simulations=simulations))
+
+
+# ---------------------------------------------------------------------------
 # Unified fast bucket function
 # ---------------------------------------------------------------------------
 def fast_bucket(hole_cards: list[Card], community: list[Card],
@@ -194,7 +215,34 @@ def fast_bucket(hole_cards: list[Card], community: list[Card],
 
     Preflop: uses cache (0ms after warmup).
     Postflop: uses direct equity (~5-10ms) instead of nested EHS2 (~340ms).
+    EMD mode: delegates to equity.py EMD bucketing for full histogram accuracy.
     """
+    from server.gto.equity import EMD_MODE_ENABLED
+    if EMD_MODE_ENABLED:
+        from server.gto.emd_clustering import load_equity_boundaries, fast_emd_bucket, load_preflop_table
+        if len(community) == 0:
+            # Preflop: direct table lookup
+            table = load_preflop_table()
+            c1, c2 = hole_cards[0], hole_cards[1]
+            high, low = max(c1.rank, c2.rank), min(c1.rank, c2.rank)
+            if high == low:
+                pkey = f"{high}_{low}"
+            else:
+                pkey = f"{high}_{low}_{'s' if c1.suit == c2.suit else 'o'}"
+            eq_cluster = table.get(pkey, 0)
+        else:
+            # Postflop: fast equity → boundary lookup (no histogram)
+            street = {3: 'flop', 4: 'turn', 5: 'river'}.get(len(community), 'river')
+            if _HAS_FAST_EVAL:
+                eq = _cy_equity(hole_cards, community, simulations=simulations)
+            else:
+                eq = hand_equity(hole_cards, community, num_opponents=1,
+                                 simulations=simulations)
+            boundaries = load_equity_boundaries()[street]
+            eq_cluster = fast_emd_bucket(eq, boundaries)
+        hand_type = classify_hand_type(hole_cards[0].rank, hole_cards[1].rank,
+                                       hole_cards[0].suit == hole_cards[1].suit)
+        return make_bucket(eq_cluster, int(hand_type))
     if len(community) == 0:
         return get_preflop_bucket(hole_cards)
     return cached_postflop_bucket(hole_cards, community, simulations)

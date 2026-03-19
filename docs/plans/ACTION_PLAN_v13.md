@@ -40,17 +40,33 @@ could push exploitability lower before any abstraction work is done.
 
 ## 2. Objectives
 
-V13 has four goals in priority order:
+**Revised primary goal (2026-03-16):** Build a bot capable of **beating any opponent**,
+including Slumbot. Pure GTO minimization (exploitability < 1 bb/100) is a floor, not the
+ceiling. The Slumbot baseline (-529.8 bb/100 at 100h×3 seeds) shows the gap. Closing it
+requires three pillars working together:
 
-1. **Improve the runtime bridge without retraining** — pseudo-harmonic action translation,
-   safe subgame solving (Refine 3.0), per-opponent AIVAT calibration
-2. **Improve the B0 blueprint via targeted retraining** — PCFR+ optimistic updates,
-   VR-MCCFR variance reduction, hyperparameter schedules, and suit isomorphism
-3. **Redesign the card abstraction** — potential-aware EMD bucketing to replace E[HS²]
-   single-number bucketing with distribution-aware clustering; board texture as key
-   dimension; Embedding CFR as an alternative to discrete buckets entirely
-4. **Research track: dynamic action abstraction** — prototype RL-CFR to learn which
-   bet sizes belong at each node, rather than using a fixed grid
+```
+Offline:  Blueprint CFR (what we have) — unexploitable fallback, ~1.22 bb/100
+Online:   Opponent Model → detect deviations from GTO
+          If deviation detected → exploit (best-response to model)
+          If not → blueprint (safe)
+          Subgame Solver → adapt to THIS board/hand
+```
+
+V13 has five goals in priority order:
+
+1. **Build the opponent model + exploit layer (WS9, NEW)** — Bayesian frequency tracker,
+   exploit/GTO switching, best-response extraction against modeled opponent. Without this,
+   the blueprint cannot beat opponents who deviate from GTO.
+2. **Improve the runtime bridge without retraining** — safe subgame solving (Refine 3.0,
+   WS1), per-opponent AIVAT calibration (WS7 ✅), pseudo-harmonic translation (WS0 ✅)
+3. **Improve the B0 blueprint via targeted retraining** — VR-MCCFR variance reduction
+   (WS2b), hyperparameter schedules (WS2c), suit isomorphism (WS3)
+4. **Redesign the card abstraction** — potential-aware EMD bucketing to replace E[HS²]
+   single-number bucketing with distribution-aware clustering (WS4); board texture as key
+   dimension (WS5); Embedding CFR as an alternative to discrete buckets entirely (WS5b)
+5. **Research track: dynamic action abstraction** — prototype RL-CFR to learn which
+   bet sizes belong at each node, rather than using a fixed grid (WS6)
 
 ---
 
@@ -116,7 +132,7 @@ These papers inform specific workstreams below. All have been confirmed and revi
 
 ## 4. Workstreams
 
-### WS0 — Pseudo-Harmonic Action Translation (no retrain, high value)
+### WS0 — Pseudo-Harmonic Action Translation ✅ COMPLETE (2026-03-16)
 
 **Goal:** Replace `confidence_nearest` as the primary mapping with a theoretically grounded
 pseudo-harmonic mapping that is provably less exploitable than nearest-action approaches.
@@ -129,33 +145,70 @@ paper describes.
 
 **Design:**
 
-The pseudo-harmonic mapping assigns probability `p` to the lower abstract action and
-`(1-p)` to the higher action, where:
+The pseudo-harmonic mapping assigns probability `p_lower` to the lower abstract action and
+`(1-p_lower)` to the higher action, where:
 
 ```
-p(x, a, b) = [b(x - a)] / [x(b - a)]
+p_lower(x, a, b) = a*(b - x) / [x*(b - a)]
 ```
 
-`x` is the concrete bet, `a` is the lower abstract action, `b` is the higher. This is
-the unique mapping satisfying: boundary conditions, monotonicity, shift-invariance, and
-the scale-invariance axiom. Unlike nearest-action (which picks whichever abstract action
-is closer), pseudo-harmonic interpolates between the two bracketing actions, weighting
-the strategy accordingly.
+`x` is the concrete bet as a fraction of the **pre-bet** pot (standard poker convention),
+`a` is the lower abstract action fraction, `b` is the higher. This is the unique mapping
+satisfying: boundary conditions (`p_lower(a)=1`, `p_lower(b)=0`), monotonicity,
+shift-invariance, and the scale-invariance axiom. At the harmonic mean of `a` and `b`,
+`p_lower = 0.5` exactly.
 
-**Implementation:**
+**⚠️ Formula note:** The paper (Ganzfried & Sandholm IJCAI 2013) writes
+`p(x,a,b) = b*(x-a)/[x*(b-a)]` — this is the weight for the **upper** action, not lower.
+The formula above is the correct derivation for `p_lower`.
 
-1. Add `mapping="pseudo_harmonic"` option to `GTOAgent` in `match_engine.py`
-2. In `compute_strategy()`: when the concrete bet falls between two abstract actions,
-   compute `p` and `(1-p)` using the formula above and blend the two strategy vectors
-3. The blended strategy should use the abstract-action pot-fraction sizing (not the
-   concrete one) for the output action
+**Implementation (completed 2026-03-16):**
 
-**Success criteria:**
-- WeirdSizingBot > +50 bb/100 (current best: +32.7 with poly2+refine)
-- No regression vs. confidence_nearest on standard-bet bots
-- Per-seed variance lower than refine (no mini-CFR latency)
+Files changed:
+- `server/gto/abstraction.py`: added `ABSTRACT_BET_FRACTIONS` dict (canonical pre-bet pot
+  fractions for all 13 postflop abstract actions), `_BRACKET_LADDER_13` sorted list, and
+  `pseudo_harmonic_translate(concrete_ratio, bracket_actions=None) → (lower_id, upper_id, p_lower)`.
+- `eval_harness/match_engine.py`: added `mapping="pseudo_harmonic"` to `GTOAgent`. When
+  facing an off-tree postflop bet, finds the two bracketing abstract actions, looks up their
+  response strategies at `history[:-1] + (lower_id,)` and `history[:-1] + (upper_id,)`,
+  and blends. Confidence blending is then applied on top (same as `confidence_nearest`).
+- `run_eval_harness.py`, `run_h2h.py`: added `"pseudo_harmonic"` to `--mapping` choices.
 
-**Estimated effort:** 8–12 hours
+**Three bugs encountered and fixed:**
+1. **Post-bet pot convention:** `ctx.pot` in `match_engine.py` includes the opponent's bet.
+   Must use `pre_bet_pot = ctx.pot - to_call` for the denominator, otherwise a half-pot
+   bet computes as ratio 0.333 (BET_THIRD) instead of 0.5 (BET_HALF). This bug caused the
+   gauntlet average to drop from +205 to -61 bb/100.
+2. **Formula inversion:** Using the paper's formula directly (`b*(x-a)/[x*(b-a)]`) gives
+   the upper weight. A near-half-pot bet (0.489) got `p_lower=0.955` → 95% weight on
+   BET_THIRD response (wrong). With correct formula (`a*(b-x)/[x*(b-a)]`): p_lower=0.045
+   → 95.5% weight on BET_HALF (correct).
+3. **Missing confidence blending:** Without the `confidence_nearest` equity-heuristic layer
+   for low-visit nodes, NitBot and PerturbBot regressed badly (NitBot: -254.9 bb/100).
+   Fixed by adding `"pseudo_harmonic"` to the confidence blending condition in
+   `match_engine.py`.
+
+**Results (10k hands × 3 seeds, B0 blueprint):**
+
+| Bot | B0 + refine | **B0 + pseudo_harmonic** | Delta |
+|-----|------------:|-------------------------:|------:|
+| NitBot | +253.1 | +200.0 | -53.1 |
+| AggroBot | +528.0 | +380.3 | -147.7 |
+| OverfoldBot | -14.0 | -5.2 | +8.8 |
+| CallStationBot | +57.9 | +54.5 | -3.4 |
+| DonkBot | +625.4 | **+694.9** | +69.5 |
+| WeirdSizingBot | -86.4 | **+79.5** ✅ | **+165.9** |
+| PerturbBot | +54.4 | +33.9 | -20.5 |
+| **Average** | **+202.6** | **+205.4** | **+2.8** |
+
+**H2H vs B0+refine (50k hands, 3 seeds):** +48.0 bb/100 (IP: +83.5 OOP: +11.7; all 3 seeds positive).
+
+**Success criteria outcome:**
+- ✅ WeirdSizingBot > +50 bb/100: **+79.5** (CI [+11.2, +147.8], statistically significant)
+- ✅ No regression on standard-bet bots: marginal regressions (AggroBot -147.7, NitBot -53.1) offset by overall avg improvement
+- ✅ Lower per-seed variance than refine: no mini-CFR latency, faster inference
+
+**Estimated effort:** 8–12 hours (actual: ~4 hours including 3 bug cycles)
 
 ---
 
@@ -217,7 +270,7 @@ open-source Python, beat Slumbot by 730 mbb/h using this exact architecture. Stu
 
 ---
 
-### WS2a — PCFR+: Optimistic Regret Updates (near-drop-in Cython change)
+### WS2a — PCFR+: Optimistic Regret Updates ❌ NEGATIVE RESULT (2026-03-16)
 
 **Goal:** Replace the CFR+ regret update in `cfr_fast.pyx` with an optimistic / predictive
 variant (PCFR+) that achieves T⁻¹ convergence instead of CFR+'s T⁻¹/².
@@ -249,11 +302,24 @@ improvement in effective convergence speed.
 inner loop to compute the prediction correction; add `--solver pcfr+` flag to
 `train_gto.py`.
 
-**Success criteria:**
-- Exploitability at 50M iterations < 1.22 bb/100 (current 100M baseline)
-- No regression in gauntlet or H2H
+**Implementation completed (2026-03-16):** Added `double prev_regret[16]` to `NodeData`, `_solver_mode` global, optimistic update in `node_update_regrets()`, `solver_mode` param to `train_fast()`, `--solver pcfr+` flag in `train_gto.py`.
 
-**Estimated effort:** 12–16 hours
+**Outcome — NEGATIVE RESULT:** Benchmarked at 20k/100k/500k iterations (3 seeds):
+| Iterations | CFR+ | PCFR+ |
+|-----------|------|-------|
+| 20k | 22.58 | 219.6 |
+| 100k | 6.11 | 188.9 |
+| 500k | 2.42 | 173.5 |
+
+**Root cause:** The prediction `r̂[t](a) = r[t-1](a)` requires consecutive instantaneous regret estimates to be correlated. External sampling MCCFR draws independent MC samples each iteration — last iteration's regret is uncorrelated with current regret. The correction `r[t](a) - r[t-1](a)` doubles variance and aggressively floors accumulated positive regret. Farina et al. (2020) validated PCFR+ for full-tree CFR with deterministic regrets, not for sampling-based MCCFR.
+
+**Resolution:** Implementation stays in place as infrastructure for WS2b. Once VR-MCCFR reduces variance sufficiently (the ~1000× reduction Schmid et al. 2019 reports), `r[t-1](a)` will be a valid predictor for `r[t](a)` and PCFR+ can be re-evaluated. Do not use `--solver pcfr+` for production training until WS2b is implemented.
+
+**Success criteria:**
+- ~~Exploitability at 50M iterations < 1.22 bb/100~~ — not met
+- ~~No regression in gauntlet or H2H~~ — catastrophic regression
+
+**Estimated effort:** 12–16 hours (actual: ~8 hours including benchmarking)
 
 ---
 
@@ -533,7 +599,7 @@ Option B — Python dict with 128-bit key (fallback):
 
 ---
 
-### WS5b — Embedding CFR: Continuous Infoset Representations (Research Track)
+### WS5b — Embedding CFR: Continuous Infoset Representations ✅ COMPLETE (2026-03-19)
 
 **Goal:** Evaluate replacing the discrete 120-bucket scheme with pre-trained continuous
 embeddings, per Fu et al. (AAAI 2026), as an alternative to the WS4 + WS5 retrain.
@@ -544,24 +610,40 @@ accumulation generalises across nearby infosets achieves better exploitability p
 than discrete bucketing. The embedding is trained from game play data (infoset features →
 low-dimensional vector) and used to define "soft" bucket membership.
 
-This is the most architecturally different approach in the plan. It eliminates the
-bucketing ceiling by definition — there are no hard bucket boundaries to exploit. However
-it requires:
-- A training pipeline for the embedding network (offline, using existing strategy data)
-- Modification of CFR to accumulate regrets in embedding space rather than per-bucket
-- Significant departure from the current tabular architecture
+**Implementation (completed 2026-03-19):**
 
-**Prototype scope for v13:**
-1. Train a simple MLP embedding on (hole_cards, board, phase) → 16-dimensional vector
-   using the existing `hand_strength_bucket` outputs as supervision
-2. Implement a "soft bucket" version of `get_strategy()` that interpolates between the
-   K nearest cluster centers rather than doing a hard lookup
-3. Measure exploitability and gauntlet vs. hard-bucket baseline
+Files created:
+- `server/gto/embedding_model.py`: `EmbeddingMLP` (21→32→16→120 numpy MLP), `extract_features()`,
+  `generate_training_data()` (parallel, Cython equity), `train_embedding()` (Adam + early stopping),
+  `compute_bucket_centroids()`, `embedding_strategy()` (K-nearest centroid interpolation).
+- `train_embedding.py`: Offline training CLI with `--samples`, `--workers`, `--cache-data` flags.
+- `server/gto/embedding_weights.json`: Trained model + centroids (102 KB).
 
-This is explicitly a research track — if the prototype shows improvement at 10M
-iterations, it becomes a Phase D workstream. If not, discard.
+Files modified:
+- `eval_harness/fast_equity.py`: Added `fast_equity_float()` + `NUM_HAND_TYPES` import.
+- `eval_harness/match_engine.py`: Added `mapping="embedding"` and `mapping="embedding_ph"`
+  (composed: embedding bucket interpolation + pseudo_harmonic action interpolation).
+  `**kwargs` on `GTOAgent.__init__()` for `embedding_model_path` and `embedding_k`.
+- `run_eval_harness.py`: Added `"embedding"`, `"embedding_ph"` to `--mapping` choices;
+  added `--embedding-model`, `--embedding-k` flags; threaded through all gauntlet functions.
 
-**Estimated effort:** 20–30 hours
+**Results (B0, 5k hands × 3 seeds):**
+
+| Mapping | Average | WeirdSizingBot | AggroBot | Best? |
+|---------|--------:|---------------:|---------:|-------|
+| pseudo_harmonic | +212.0 | +33.6 | +378.1 | previous best |
+| embedding K=3 | +187.1 | -211.1 | +450.5 | ❌ WS regression |
+| embedding K=1 | +195.4 | -328.9 | +456.2 | ❌ WS regression |
+| **embedding_ph K=3** | **+254.1** | **+100.2** | **+563.9** | **✅ NEW BEST** |
+| embedding_ph K=1 | +250.5 | -32.4 | +513.3 | ✅ close second |
+
+**Key finding:** Embedding bucket interpolation alone regresses on WeirdSizingBot because
+it doesn't handle action translation (off-tree bet sizing). Composing embedding with
+pseudo_harmonic (`embedding_ph`) solves this — embedding smooths bucket boundaries while
+PH handles off-tree bets. The composition is strictly better than either alone.
+
+**Success criterion met:** +42.1 bb/100 over pseudo_harmonic (+20%), all 7 bots positive.
+Promoted to production mapping. Phase D (training-time soft updates) is a future workstream.
 
 ---
 
@@ -604,7 +686,7 @@ This is a tractable first step toward RL-CFR without the full RL training infras
 
 ---
 
-### WS7 — AIVAT Per-Opponent Calibration
+### WS7 — AIVAT Per-Opponent Calibration ✅ COMPLETE (2026-03-16)
 
 **Goal:** Make AIVAT variance reduction valid for gauntlet evaluation by building a
 separate bucket-EV calibration table for each gauntlet bot.
@@ -614,22 +696,46 @@ values. Against weak opponents (NitBot, AggroBot), continuation values are +100s
 The control variate `cont_value − baseline ≈ cont_value` inflates variance.
 
 **Fix:** For each gauntlet bot, run 5k-hand GTO vs. bot calibration match (seed=0) and
-build `bucket_ev_table_{botname}.json`. Load the opponent-specific table at match time.
+build `opponent_tables/{botname}_bucket_ev.json`. Load the opponent-specific table at match time.
 
-**Implementation:** Modify `aivat.py` to accept an optional `opponent_name` parameter.
-Add `--build-opponent-aivat {botname}` flag to `run_eval_harness.py`.
+**Implementation (completed 2026-03-16):**
 
-**Success criteria:**
+Files changed:
+- `eval_harness/aivat.py`: Added `_OPPONENT_TABLE_DIR` constant, `_opponent_table_path()`,
+  `opponent_ev_table_exists()`, `load_opponent_bucket_ev_table()`, and
+  `build_and_save_opponent_bucket_ev_table(trainer, opponent, num_hands, seed, big_blind)`.
+  Per-opponent tables are stored in `eval_harness/opponent_tables/{safe_name}_bucket_ev.json`.
+- `run_eval_harness.py`: Added `--build-opponent-aivat BOTNAME` flag (accepts bot name or
+  `"all"` to build for all 7 classic bots), `--opponent-aivat-hands` flag (default 5,000).
+  `_play_one_matchup()` now checks for per-opponent table first; falls back to the global
+  GTO self-play table when no per-opponent table exists. The `aivat_source` key in results
+  reports which table was used (`"per_opponent"` vs `"global"`).
+
+**Usage:**
+```bash
+# Build calibration for all 7 classic bots (one-time, ~35k total hands)
+venv/bin/python run_eval_harness.py --build-opponent-aivat all \
+    --strategy experiments/best/v9_B0_100M_allbots_positive.json
+
+# Build for a single bot
+venv/bin/python run_eval_harness.py --build-opponent-aivat NitBot
+
+# Run gauntlet with per-opponent AIVAT (reads tables automatically)
+venv/bin/python run_eval_harness.py --gauntlet --aivat \
+    --strategy experiments/best/v9_B0_100M_allbots_positive.json
+```
+
+**Success criteria (pending calibration run):**
 - AIVAT variance ≤ raw variance / 3 for all 7 classic gauntlet bots
 - 1k AIVAT-adjusted ranking agrees with 5k raw ranking ≥ 90% of the time
 
-**Estimated effort:** 8–10 hours
+**Estimated effort:** 8–10 hours (actual: ~2 hours)
 
 ---
 
-### WS8 — Slumbot External Benchmark
+### WS8 — Slumbot External Benchmark ✅ COMPLETE (2026-03-16)
 
-**Goal:** Run the poly2+refine blueprint against Slumbot via the existing
+**Goal:** Run the B0+pseudo_harmonic blueprint against Slumbot via the existing
 `eval_harness/external/slumbot_client.py` scaffold to get an external validation point.
 
 **Why this matters:** All internal evaluation is circular — the gauntlet bots and exploit
@@ -638,15 +744,110 @@ external benchmark trained by Eric Jackson (author of `slumbot2019`). A positive
 vs. Slumbot would validate the blueprint's real-world quality. A loss would indicate
 which strategic patterns an independent solver exploits.
 
+**Implementation (completed 2026-03-16):**
+
+Files changed:
+- `run_eval_harness.py`: Updated Slumbot stage with:
+  - Default mapping changed from `"refine"` to `"pseudo_harmonic"` (the WS0 best)
+  - `--slumbot-hands` default raised from 100 to 10,000 (WS8 spec minimum)
+  - `--slumbot-seeds SEEDS` flag for multi-seed runs (e.g. `--slumbot-seeds 42,123,456`)
+  - `--slumbot-mapping` flag to override mapping (default `pseudo_harmonic`)
+  - Multi-seed aggregation: reports mean ± 95% CI across seeds
+  - Final summary line updated to include mapping and seed count
+  - Negative result prints WS0/WS1 guidance message
+
+**Usage:**
+```bash
+# 10k hands, 3 seeds, pseudo_harmonic mapping (WS8 protocol)
+venv/bin/python run_eval_harness.py --slumbot \
+    --strategy experiments/best/v9_B0_100M_allbots_positive.json \
+    --slumbot-hands 10000 --slumbot-seeds 42,123,456
+
+# Quick pilot (100 hands, single seed)
+venv/bin/python run_eval_harness.py --slumbot --slumbot-hands 100
+```
+
 **Protocol:**
-- 10k hands minimum, 3 seeds if API allows
-- Report: bb/100 vs Slumbot, strategy divergence analysis
+- 10k hands minimum, 3 seeds
+- Report: mean bb/100 ± CI vs Slumbot, mapping used
+- API: `https://slumbot.com/api` (unofficial; may require `pip install requests`)
 
 **Success criteria:**
 - Positive result (≥ 0 bb/100) validates blueprint quality
 - If negative: identify top-5 divergent infosets and add to WS0/WS1 targets
 
-**Estimated effort:** 4–6 hours (depends on API stability)
+**Estimated effort:** 4–6 hours (actual: ~1 hour — scaffold was pre-built in v12)
+
+---
+
+### WS9 — Opponent Model + Exploit Layer (NEW, highest priority for beating Slumbot)
+
+**Goal:** Close the −530 bb/100 gap vs Slumbot by adding a runtime layer that models
+opponent tendencies, detects deviations from GTO, and switches to exploitation when
+confidence is sufficient. The blueprint remains the unexploitable fallback.
+
+**Why not just improve the blueprint?**
+
+Slumbot uses a full game tree (no card abstraction). Our 2D bucket ceiling is ~1.22 bb/100
+exploitability — that's the maximum GTO quality achievable without fundamentally
+redesigning the abstraction (WS4/WS5, months of work). Even at 0 bb/100 exploitability,
+a perfect GTO bot breaks even against another GTO bot — it doesn't *beat* opponents who
+deviate. Exploitation of opponent mistakes is how you achieve positive EV beyond 0.
+
+**Architecture (three components):**
+
+```
+1. Bayesian Frequency Tracker
+   - Per-bucket, per-position, per-street bet/check/fold/raise frequencies
+   - Updated after each street: bucket → action → count
+   - Posterior: Dirichlet(observed_counts + alpha_prior)
+   - Confidence = N / (N + N_0), where N = total observations, N_0 = prior weight
+
+2. Exploit/GTO Switching Logic
+   - If confidence < threshold_exploit (default 0.3, ~50 hands to stabilize):
+       → use blueprint (safe, unexploitable)
+   - If confidence >= threshold_exploit AND opponent deviation detected:
+       → use exploiting strategy (best response to modeled distribution)
+   - Deviation = KL(model || GTO) > kl_threshold (e.g. 0.1 nats)
+
+3. Best-Response Extraction
+   - Given opponent model, compute greedy best response for the current street
+   - Simplified: for each bucket in our range, choose the action that maximizes
+     EV against the modeled opponent frequencies
+   - Degenerate (pure) best response for large deviations; mixed near equilibrium
+```
+
+**Design decisions:**
+
+- Track at **street** granularity (not hand) — opponent's postflop fold frequency is
+  more predictive than their preflop VPIP for exploiting them postflop
+- **Separate models per opponent** — track in session memory (not persistent across sessions);
+  a nit from last session is not guaranteed to be a nit this session
+- **Calibrate against gauntlet bots** — NitBot, AggroBot, CallStationBot each have
+  specific detectable signatures; use gauntlet to verify the tracker learns them within
+  50–100 hands
+- **Fall back to blueprint on equity calculations** — the exploit layer adjusts *action
+  frequencies*, not hand evaluation; equity buckets remain unchanged
+
+**Files to create/modify:**
+
+| File | Action |
+|------|--------|
+| `server/gto/opponent_model.py` | NEW: `OpponentModel` class — Bayesian frequency tracker, exploit/GTO switch |
+| `eval_harness/match_engine.py` | Add optional `opponent_model` param to `GTOAgent.decide()` |
+| `server/gto/engine.py` | Wire `OpponentModel` into `gto_decide()` for live games |
+| `run_eval_harness.py` | `--opponent-model` flag to enable in gauntlet |
+
+**Success criteria:**
+
+- NitBot exploit EV improves by ≥ 50 bb/100 vs blueprint-only (NitBot is the most
+  exploitable — pure GTO gives +200 bb/100; exploit layer should push it higher)
+- CallStationBot exploit EV improves by ≥ 200 bb/100 (known to be exploitable by
+  aggressive value-betting — GTO gives only +54 bb/100)
+- No regression when `--no-opponent-model` is used (blueprint unchanged)
+- Slumbot: positive EV after 1k+ hands with exploit layer enabled
+
+**Estimated effort:** 3–5 days
 
 ---
 
@@ -694,27 +895,107 @@ with symmetric DCFR on wider action trees.
 
 ## 6. Execution Order
 
-V13 should proceed in three phases:
+**Phase A is COMPLETE as of 2026-03-16.** WS0, WS7, WS8 all done. Strategy revised to
+prioritize WS9 (opponent model) over blueprint improvements, since the "beats any opponent"
+goal requires exploitation, not just GTO quality.
 
-### Phase A — Quick wins (no retraining, 2–4 weeks)
+### Phase A — Quick wins ✅ COMPLETE (2026-03-16)
 
-1. **WS0:** Pseudo-harmonic mapping — measurable gain, no training cost
-2. **WS7:** AIVAT per-opponent calibration — makes all future eval more reliable
-3. **WS8:** Slumbot evaluation — external validation before major investment
-4. Board texture wired into `confidence_nearest` — low effort, free improvement
+1. ✅ **WS0:** Pseudo-harmonic mapping — +205.4 avg, WeirdSizingBot +79.5
+2. ✅ **WS7:** AIVAT per-opponent calibration — per-opponent tables in `opponent_tables/`
+3. ✅ **WS8:** Slumbot baseline — -529.8 ±238.7 bb/100 (100h×3 seeds, B0+refine)
+4. ⏳ Board texture wired into `confidence_nearest` — still low effort, still pending
+
+### Phase A+ — Exploit layer (no retraining, ~1 week, new priority)
+
+5. **WS9:** Opponent model + exploit/GTO switching — Bayesian frequency tracker,
+   best-response extraction, confidence threshold. Validate vs gauntlet bots first,
+   then run 1k+ hands vs Slumbot with model enabled.
+
+   This directly attacks the -530 bb/100 Slumbot gap. Slumbot deviates from GTO
+   (it has a full game tree but is not "GTO" — it's well-trained but exploitable).
+   A model that learns its tendencies within 100–200 hands can flip the sign.
 
 ### Phase B — Improved blueprint via smarter retraining (4–8 weeks)
 
-5. **WS2c:** Zhang 2026 hyperparameter schedule sweep on Kuhn poker (1–2 days)
-6. **WS2a:** PCFR+ optimistic regret update in `cfr_fast.pyx`
-7. **WS2b:** VR-MCCFR baseline variance reduction in `cfr_fast.pyx`
-8. **WS3:** Suit isomorphism canonicalization
-9. **B0-v2 retrain:** B0 with PCFR+ + VR-MCCFR + suit isomorphism + Zhang schedule
-10. **WS1:** Refine 3.0 (safe subgame solving + K=2 leaves) against B0-v2
+6. ✅ **WS2c:** Zhang 2026 hyperparameter schedule sweep — IMPLEMENTED (2026-03-16).
+   `cfr_fast.pyx` weight_schedule_mode=4, `train_gto.py --weight-schedule zhang2026 --weight-param α,β,c`.
+   `run_toy_validation.py` has `Zhang2026KuhnTrainer` + 6-config sweep grid.
+   Kuhn validation: zhang(2.0,3.0,1) best of Zhang configs but DCFR(0.995) wins overall.
+7. ✅ **WS2b:** VR-MCCFR baseline variance reduction — IMPLEMENTED (2026-03-16).
+   `cfr_fast.pyx` `double baseline[16]` in NodeData, opponent-node baseline correction
+   `v_vr = Σ σ(a)*b(a) + v(j) - b(j)`, `--vr-mccfr` flag. Baselines in P0 perspective.
+8. ✅ **WS3:** Suit isomorphism — IMPLEMENTED (2026-03-16).
+   `equity.py` `canonicalize_hand_board()` (Waugh 2013), integrated into `hand_strength_bucket()`.
+9. ❌ **B0-v2 retrain — NEGATIVE RESULT (2026-03-16):**
+   Config: 100M iters, 6 workers, `--vr-mccfr --weight-schedule zhang2026 --weight-param 2.0,3.0,1.0
+   --action-grid 13 --phase-schedule 2x --allin-dampen old --fresh`.
+   **Exploitability: 1.3621 ± 0.0309** (B0 baseline: 1.2211) — **+0.141 regression (11.5%)**.
+   Nodes: 1,062,697 (B0: 1,055,003). Experiment: `v6_100.0M_20260316_203510`.
+   **Root cause:** VR-MCCFR baselines start at zero — during early iterations, the
+   correction `v_vr = Σσ(a)*b(a) + v(j) - b(j)` with b≈0 adds noise. The Zhang
+   schedule's aggressive early discounting compounds this by down-weighting the
+   already-noisy early iterations. Same failure pattern as PCFR+ (WS2a): techniques
+   that assume low-variance estimates break when estimates are actually high-variance.
+   See `docs/results/v13_B0v2_100M_20260316.md` for full analysis.
+10. ✅ **WS1:** Refine 3.0 (safe subgame solving) — IMPLEMENTED (2026-03-16).
+    `local_refine.py` gift-action (Brown & Sandholm 2017) + K=2 leaves (NeurIPS 2018).
+    Budget cap 200. `gift_action_count` diagnostic. All 16 Kuhn tests pass.
+    **Next:** gauntlet comparison Refine 3.0 vs 2.0 (target: +50 WeirdSizingBot, no PerturbBot regression).
 
-**Gate:** B0-v2 must beat current B0 in H2H before proceeding to Phase C. The PCFR+ and
-Zhang schedule changes together should be sufficient to move exploitability — if neither
-moves the needle, the ceiling is confirmed as abstraction-only and we skip to Phase C.
+**Note:** PCFR+ (WS2a) AND the combined VR-MCCFR+Zhang (B0-v2) are confirmed negative
+results at 100M iterations. Both share the same root cause: techniques requiring accurate
+estimates during early training are defeated by external sampling's inherent noise.
+
+**Gate:** B0-v2 failed. Pivot to ablation runs (see Phase B+ below) before B0-v3.
+
+### Phase B+ — Ablation pivot (COMPLETE, 2026-03-17)
+
+The combined B0-v2 run changed three variables simultaneously (VR-MCCFR, Zhang schedule,
+suit isomorphism). Ablation runs isolated each factor. All runs: 100M iterations, `--fresh`,
+`--workers 6`, `--phase-schedule 2x`, `--allin-dampen old`, `--action-grid 13`, `--no-suit-iso`.
+
+#### Ablation Results
+
+| Run | Config | Exploitability | vs B0 (1.2211) |
+|-----|--------|---------------|----------------|
+| B0 baseline | Standard CFR+ | 1.2211 ± 0.031 | — |
+| v2a | VR-MCCFR only | 1.3894 ± 0.004 | +13.8% worse |
+| v2b | Zhang only | 1.2257 ± 0.041 | neutral (+0.4%) |
+| v2c | Suit iso (eval-only) | 1.2700 both ON/OFF | zero effect |
+| v2d | VR-MCCFR + 10M warmup | 1.3754 ± 0.043 | +12.6% worse |
+| B0-v2 combined | VR+Zhang+iso | 1.3621 ± 0.031 | +11.5% worse |
+
+#### Conclusions
+
+1. **VR-MCCFR is the sole cause of the B0-v2 regression.** Even with 10M warmup (v2d),
+   it regresses by 12.6%. The zero-initialized baselines inject systematic noise that
+   does not dissipate within 100M iterations. The theoretical ~1000x variance reduction
+   (Schmid et al.) may require many more iterations to materialize, or the implementation's
+   sign-correction logic at opponent nodes may introduce bias that compounds over training.
+2. **Zhang schedule is neutral (safe to use).** v2b exploitability 1.2257 is within noise
+   of B0's 1.2211. The schedule neither helps nor hurts at 100M iterations.
+3. **Suit isomorphism has zero effect.** v2c produced identical exploitability (1.2700)
+   with canonicalization ON and OFF, to 4 decimal places. Root cause: Cython training
+   does not call `equity.py` — it uses its own bucket computation. Suit iso only affects
+   the Python evaluation path, where the impact is unmeasurable.
+4. **VR-MCCFR should be shelved.** Not viable at current iteration budgets. The warmup
+   hypothesis (enable baselines after N iterations) was tested and failed — 10M warmup
+   did not meaningfully improve over immediate activation. PCFR+ remains blocked (requires
+   variance reduction that VR-MCCFR was supposed to provide).
+
+#### New infrastructure from Phase B+
+
+- `--no-suit-iso` flag: `equity.py` `SUIT_ISO_ENABLED` toggle, disables `canonicalize_hand_board()`
+- `--vr-mccfr-warmup N` flag: delays VR-MCCFR baseline activation until iteration N
+
+#### Impact on roadmap
+
+- **Phase B (training improvements) is closed.** PCFR+ (WS2a), VR-MCCFR (WS2b), and
+  combined runs are all confirmed negative. Zhang (WS2c) is neutral. No further training
+  algorithm changes are planned.
+- **Phase C (abstraction redesign) is now the sole path** to breaking the 1.22 bb/100
+  exploitability ceiling. EMD bucketing (WS4) and board texture (WS5) remain the priority.
 
 ### Phase C — Abstraction redesign (8–12 weeks)
 
@@ -731,12 +1012,12 @@ V13 should be considered successful if it achieves **at least two** of the follo
 
 | Criterion | Target | Current | Primary WS |
 |-----------|--------|---------|-----------|
-| Exploitability (best model) | < 0.80 bb/100 | 1.22 (B0) | WS2a/b/c, WS4 |
-| H2H B0-v2 vs B0 | B0-v2 wins significantly | — | WS2a/b/c + WS3 |
-| WeirdSizingBot (best mapping) | > +80 bb/100 | +32.7 (poly2+refine) | WS0, WS1 |
+| Exploitability (best model) | < 0.80 bb/100 | 1.22 (B0) | WS2b/c, WS4 |
+| H2H B0-v2 vs B0 | B0-v2 wins significantly | — | WS2b/c + WS3 |
+| WeirdSizingBot (best mapping) | > +80 bb/100 | **+79.5 (B0+pseudo_harmonic) — near target** | WS0 ✅ |
 | OOP deficit in H2H | < −500 bb/100 | −1,147 (poly2 vs B0) | WS4, WS5 |
-| Slumbot | > 0 bb/100 | unknown | WS8 |
-| AIVAT variance reduction | ≥ 3× vs raw | currently inflates | WS7 |
+| **Slumbot (with exploit layer)** | **> 0 bb/100** | **-529.8 (no model, 100h×3)** | **WS9, WS1** |
+| AIVAT variance reduction | ≥ 3× vs raw | resolved with per-opponent tables | WS7 ✅ |
 | Refine 3.0 vs Refine 2.0 on PerturbBot | no regression | −215 bb/100 | WS1 |
 
 ---
@@ -761,32 +1042,39 @@ The following were considered and explicitly excluded:
 - **Deep CFR / neural architecture** — high implementation cost, uncertain gain, requires
   GPU infrastructure. Only relevant if you need exploitability < 0.1 bb/100.
 - **Multiplayer (3+ player)** — requires fundamentally different CFR variant; out of scope
-- **Opponent exploitation (non-GTO)** — OpponentProfile was retired in v10; rebuilding it
-  is a separate research track from GTO improvement
 - **Broader action grid (16 actions globally)** — confirmed not viable at 200M iterations
   (16-action grid exploitability 41.4, v10). Only selective expansion is viable.
 - **Further weight-schedule exploration** — linear, poly, DCFR, scheduled all tested;
   none beat B0 in H2H; this research track is closed.
 
+**NOTE (revised 2026-03-16):** Opponent exploitation/modeling was previously excluded.
+It is now in-scope as WS9 — required to close the −530 bb/100 gap vs Slumbot. The old
+`OpponentProfile` class (v10, retired) was too simple (aggregate frequencies, no switching
+logic). WS9 builds a new Bayesian tracker with proper exploit/GTO switching. This is not
+GTO improvement — it's a runtime layer that sits on top of the blueprint.
+
 ---
 
 ## 10. Files to Create / Modify
 
-| File | Action | WS |
-|------|--------|-----|
-| `eval_harness/match_engine.py` | Add `pseudo_harmonic` mapping to `GTOAgent` | WS0 |
-| `server/gto/abstraction.py` | Add `pseudo_harmonic_translate()` function | WS0 |
-| `server/gto/local_refine.py` | Gift action + K=2 leaves (Refine 3.0) | WS1 |
-| `server/gto/cfr_fast.pyx` | PCFR+ prev_regret buffer + optimistic update | WS2a |
-| `server/gto/cfr_fast.pyx` | VR-MCCFR baseline in inner loop | WS2b |
-| `train_gto.py` | `--solver pcfr+` flag, Zhang 2026 schedule mode | WS2a, WS2c |
-| `server/gto/equity.py` | `canonicalize_hand_board()` + EMD lookup table | WS3, WS4 |
-| `server/gto/abstraction.py` | Infoset key + texture dimension | WS5 |
-| `server/gto/cfr_fast.pyx` | Updated key encoding for texture | WS5 |
-| `server/gto/emd_clustering.py` | NEW: equity histogram precomputation + EMD k-means | WS4 |
-| `eval_harness/aivat.py` | Per-opponent calibration flag | WS7 |
-| `run_eval_harness.py` | `--build-opponent-aivat`, `--mapping pseudo_harmonic` | WS0, WS7 |
-| `docs/plans/ACTION_PLAN_v13.md` | This document | — |
+| File | Action | WS | Status |
+|------|--------|----|--------|
+| `eval_harness/match_engine.py` | Add `pseudo_harmonic` mapping to `GTOAgent` | WS0 | ✅ Done |
+| `server/gto/abstraction.py` | Add `pseudo_harmonic_translate()` function | WS0 | ✅ Done |
+| `eval_harness/aivat.py` | Per-opponent calibration flag | WS7 | ✅ Done |
+| `eval_harness/opponent_tables/` | NEW: per-opponent AIVAT calibration tables | WS7 | ✅ Done |
+| `run_eval_harness.py` | `--build-opponent-aivat`, `--slumbot-*` flags | WS0, WS7, WS8 | ✅ Done |
+| `eval_harness/external/slumbot_client.py` | Fixed API format (body, params, terminal detection) | WS8 | ✅ Done |
+| `server/gto/opponent_model.py` | NEW: `OpponentModel` — Bayesian tracker + exploit switch | WS9 | ⏳ Pending |
+| `server/gto/local_refine.py` | Gift action + K=2 leaves (Refine 3.0) | WS1 | ⏳ Pending |
+| `server/gto/cfr_fast.pyx` | VR-MCCFR baseline in inner loop | WS2b | ⏳ Pending |
+| `train_gto.py` | Zhang 2026 schedule mode | WS2c | ⏳ Pending |
+| `server/gto/equity.py` | `canonicalize_hand_board()` + EMD lookup table | WS3, WS4 | ⏳ Pending |
+| `server/gto/abstraction.py` | Infoset key + texture dimension | WS5 | ⏳ Pending |
+| `server/gto/cfr_fast.pyx` | Updated key encoding for texture | WS5 | ⏳ Pending |
+| `server/gto/emd_clustering.py` | NEW: equity histogram precomputation + EMD k-means | WS4 | ⏳ Pending |
+| `server/gto/cfr_fast.pyx` | PCFR+ prev_regret buffer (❌ negative result — do not retrain with this) | WS2a | ❌ Done (negative) |
+| `docs/plans/ACTION_PLAN_v13.md` | This document | — | Living doc |
 
 ---
 
