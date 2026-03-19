@@ -212,7 +212,7 @@ Files changed:
 
 ---
 
-### WS1 — Safe Subgame Solving in Refine (Refine 3.0)
+### WS1 — Safe Subgame Solving in Refine (Refine 3.0) ⏭️ SKIPPED
 
 **Goal:** Make `local_refine.py` theoretically safe by implementing the "gift action"
 construction from Brown & Sandholm (NeurIPS 2017), and upgrade from a 1-ply backup to
@@ -780,7 +780,7 @@ venv/bin/python run_eval_harness.py --slumbot --slumbot-hands 100
 
 ---
 
-### WS9 — Opponent Model + Exploit Layer (NEW, highest priority for beating Slumbot)
+### WS9 — Opponent Model + Exploit Layer ⏭️ SKIPPED (focus is baseline GTO, not opponent exploitation)
 
 **Goal:** Close the −530 bb/100 gap vs Slumbot by adding a runtime layer that models
 opponent tendencies, detects deviations from GTO, and switches to exploitation when
@@ -908,13 +908,8 @@ goal requires exploitation, not just GTO quality.
 
 ### Phase A+ — Exploit layer (no retraining, ~1 week, new priority)
 
-5. **WS9:** Opponent model + exploit/GTO switching — Bayesian frequency tracker,
-   best-response extraction, confidence threshold. Validate vs gauntlet bots first,
-   then run 1k+ hands vs Slumbot with model enabled.
-
-   This directly attacks the -530 bb/100 Slumbot gap. Slumbot deviates from GTO
-   (it has a full game tree but is not "GTO" — it's well-trained but exploitable).
-   A model that learns its tendencies within 100–200 hands can flip the sign.
+5. ⏭️ **WS9:** Opponent model + exploit/GTO switching — SKIPPED. Focus is building a
+   strong baseline GTO model, not exploiting specific opponents.
 
 ### Phase B — Improved blueprint via smarter retraining (4–8 weeks)
 
@@ -938,10 +933,9 @@ goal requires exploitation, not just GTO quality.
    already-noisy early iterations. Same failure pattern as PCFR+ (WS2a): techniques
    that assume low-variance estimates break when estimates are actually high-variance.
    See `docs/results/v13_B0v2_100M_20260316.md` for full analysis.
-10. ✅ **WS1:** Refine 3.0 (safe subgame solving) — IMPLEMENTED (2026-03-16).
+10. ⏭️ **WS1:** Refine 3.0 (safe subgame solving) — implemented but gauntlet validation SKIPPED.
     `local_refine.py` gift-action (Brown & Sandholm 2017) + K=2 leaves (NeurIPS 2018).
-    Budget cap 200. `gift_action_count` diagnostic. All 16 Kuhn tests pass.
-    **Next:** gauntlet comparison Refine 3.0 vs 2.0 (target: +50 WeirdSizingBot, no PerturbBot regression).
+    Budget cap 200. Code in place but not benchmarked vs Refine 2.0.
 
 **Note:** PCFR+ (WS2a) AND the combined VR-MCCFR+Zhang (B0-v2) are confirmed negative
 results at 100M iterations. Both share the same root cause: techniques requiring accurate
